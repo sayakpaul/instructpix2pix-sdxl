@@ -1,4 +1,5 @@
 git+https://github.com/huggingface/diffusers
+accelerate transformers
 wandb
 webdataset
 xformers
