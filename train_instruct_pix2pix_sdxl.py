@@ -422,8 +422,8 @@ def parse_args():
         args.local_rank = env_local_rank
 
     # Sanity checks
-    if args.dataset_name is None and args.train_data_dir is None:
-        raise ValueError("Need either a dataset name or a training folder.")
+    if args.dataset_path is None:
+        raise ValueError("dataset_path cannot be None.")
 
     # default to using the same revision for the non-ema model if not specified
     if args.non_ema_revision is None:
