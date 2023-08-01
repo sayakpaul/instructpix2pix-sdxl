@@ -1040,7 +1040,7 @@ def main():
             accelerator.log(logs, step=global_step)
 
             ### BEGIN: Perform validation every `validation_epochs` steps
-            if global_step % args.validation_steps == 0 or global_step == 1:
+            if global_step % args.validation_steps == 0:
                 if (args.val_image_url_or_path is not None) and (
                     args.validation_prompt is not None
                 ):
