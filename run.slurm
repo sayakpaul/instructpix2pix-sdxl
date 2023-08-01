@@ -51,13 +51,12 @@ use_cpu: false
 EOT
 
 
-export MODEL_ID="stabilityai/stable-diffusion-xl-base-0.9"
-export DATASET_ID="pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -"
+export MODEL_ID="stabilityai/stable-diffusion-xl-base-1.0"
 
 PROGRAM="train_instruct_pix2pix_sdxl.py \
     --pretrained_model_name_or_path=$MODEL_ID \
     --pretrained_vae_model_name_or_path=madebyollin/sdxl-vae-fp16-fix \
-    --dataset_path=$DATASET_ID \
+    --dataset_path='pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -' \
     --use_ema \
     --enable_xformers_memory_efficient_attention \
     --resolution=256 --random_flip \
