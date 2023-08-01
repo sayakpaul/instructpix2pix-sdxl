@@ -98,7 +98,7 @@ def gen_examples(
 
 
 if __name__ == "__main__":
-    dataset = datasets.load_dataset(DATASET_NAME, split="train")
+    dataset = datasets.load_dataset(DATASET_NAME, split="train", num_proc=4)
     print(f"Dataset has got {len(dataset)} samples.")
 
     model = load_model().eval().to("cuda")
