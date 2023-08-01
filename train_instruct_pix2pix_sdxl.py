@@ -1179,7 +1179,12 @@ def main():
         if args.validation_prompt is not None:
             edited_images = []
             pipeline = pipeline.to(accelerator.device)
-            with torch.autocast(str(accelerator.device).replace(":0", "")):
+            original_image = (
+                lambda image_url_or_path: load_image(image_url_or_path)
+                if urlparse(image_url_or_path).scheme
+                else Image.open(image_url_or_path).convert("RGB")
+            )(args.val_image_url_or_path)
+            with torch.autocast(accelerator.device.type, enabled=accelerator.mixed_precision == "fp16",):
                 for _ in range(args.num_validation_images):
                     edited_images.append(
                         pipeline(
