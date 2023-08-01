@@ -49,6 +49,9 @@ from diffusers.training_utils import EMAModel
 from diffusers.utils import check_min_version, deprecate, is_wandb_available, load_image
 from diffusers.utils.import_utils import is_xformers_available
 
+if is_wandb_available():
+    import wandb
+
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 check_min_version("0.20.0.dev0")
@@ -431,6 +434,83 @@ def parse_args():
 
     return args
 
+def log_validation(vae, unet, text_encoder_1, text_encoder_2, tokenizer_1, tokenizer_2, args, accelerator, weight_dtype, global_step):
+    logger.info(
+        f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
+        f" {args.validation_prompt}."
+    )
+
+
+    # The models need unwrapping because for compatibility in distributed training mode.
+    pipeline = StableDiffusionXLInstructPix2PixPipeline.from_pretrained(
+        args.pretrained_model_name_or_path,
+        unet=accelerator.unwrap_model(unet),
+        text_encoder=text_encoder_1,
+        text_encoder_2=text_encoder_2,
+        tokenizer=tokenizer_1,
+        tokenizer_2=tokenizer_2,
+        vae=vae,
+        revision=args.revision,
+        torch_dtype=weight_dtype,
+    )
+    pipeline = pipeline.to(accelerator.device)
+    pipeline.set_progress_bar_config(disable=True)
+
+    if args.enable_xformers_memory_efficient_attention:
+        pipeline.enable_xformers_memory_efficient_attention()
+
+    if args.seed is None:
+        generator = None
+    else:
+        generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
+
+    # run inference
+    # Save validation images
+    val_save_dir = os.path.join(args.output_dir, "validation_images")
+    if not os.path.exists(val_save_dir):
+        os.makedirs(val_save_dir)
+
+    original_image = (
+        lambda image_url_or_path: load_image(image_url_or_path)
+        if urlparse(image_url_or_path).scheme
+        else Image.open(image_url_or_path).convert("RGB")
+    )(args.val_image_url_or_path)
+    with torch.autocast(
+        accelerator.device.type,
+        enabled=accelerator.mixed_precision == "fp16",
+    ):
+        edited_images = []
+        for val_img_idx in range(args.num_validation_images):
+            a_val_img = pipeline(
+                args.validation_prompt,
+                image=original_image,
+                num_inference_steps=20,
+                image_guidance_scale=1.5,
+                guidance_scale=7,
+                generator=generator,
+            ).images[0]
+            edited_images.append(a_val_img)
+            a_val_img.save(
+                os.path.join(
+                    val_save_dir,
+                    f"step_{global_step}_val_img_{val_img_idx}.png",
+                )
+            )
+
+    for tracker in accelerator.trackers:
+        if tracker.name == "wandb":
+            wandb_table = wandb.Table(columns=WANDB_TABLE_COL_NAMES)
+            for edited_image in edited_images:
+                wandb_table.add_data(
+                    wandb.Image(original_image),
+                    wandb.Image(edited_image),
+                    args.validation_prompt,
+                )
+            tracker.log({"validation": wandb_table})
+
+
+    del pipeline
+    torch.cuda.empty_cache()
 
 def main():
     args = parse_args()
@@ -870,7 +950,6 @@ def main():
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
-        train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
                 # We want to learn the denoising process w.r.t the edited images which
@@ -995,8 +1074,8 @@ def main():
                 progress_bar.update(1)
                 global_step += 1
 
-                if global_step % args.checkpointing_steps == 0:
-                    if accelerator.is_main_process:
+                if accelerator.is_main_process:
+                    if global_step % args.checkpointing_steps == 0:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
                             checkpoints = os.listdir(args.output_dir)
@@ -1032,6 +1111,33 @@ def main():
                         )
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
+            
+                    if global_step % args.validation_steps == 0:
+                        if (args.val_image_url_or_path is not None) and (
+                            args.validation_prompt is not None
+                        ):
+                            # create pipeline
+                            if args.use_ema:
+                                # Store the UNet parameters temporarily and load the EMA parameters to perform inference.
+                                ema_unet.store(unet.parameters())
+                                ema_unet.copy_to(unet.parameters())
+                            
+                            log_validation(
+                                vae=vae,
+                                unet=unet,
+                                text_encoder_1=text_encoder_1,
+                                text_encoder_2=text_encoder_2,
+                                tokenizer_1=tokenizer_1,
+                                tokenizer_2=tokenizer_2,
+                                args=args,
+                                accelerator=accelerator,
+                                weight_dtype=weight_dtype,
+                                global_step=global_step,
+                            )
+
+                            if args.use_ema:
+                                # Switch back to the original UNet parameters.
+                                ema_unet.restore(unet.parameters())
 
             logs = {
                 "step_loss": loss.detach().item(),
@@ -1039,88 +1145,6 @@ def main():
             }
             progress_bar.set_postfix(**logs)
             accelerator.log(logs, step=global_step)
-
-            ### BEGIN: Perform validation every `validation_epochs` steps
-            if global_step % args.validation_steps == 0:
-                if (args.val_image_url_or_path is not None) and (
-                    args.validation_prompt is not None
-                ):
-                    logger.info(
-                        f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
-                        f" {args.validation_prompt}."
-                    )
-
-                    # create pipeline
-                    if args.use_ema:
-                        # Store the UNet parameters temporarily and load the EMA parameters to perform inference.
-                        ema_unet.store(unet.parameters())
-                        ema_unet.copy_to(unet.parameters())
-
-                    # The models need unwrapping because for compatibility in distributed training mode.
-                    pipeline = StableDiffusionXLInstructPix2PixPipeline.from_pretrained(
-                        args.pretrained_model_name_or_path,
-                        unet=accelerator.unwrap_model(unet),
-                        text_encoder=text_encoder_1,
-                        text_encoder_2=text_encoder_2,
-                        tokenizer=tokenizer_1,
-                        tokenizer_2=tokenizer_2,
-                        vae=vae,
-                        revision=args.revision,
-                        torch_dtype=weight_dtype,
-                    )
-                    pipeline = pipeline.to(accelerator.device)
-                    pipeline.set_progress_bar_config(disable=True)
-
-                    # run inference
-                    # Save validation images
-                    val_save_dir = os.path.join(args.output_dir, "validation_images")
-                    if not os.path.exists(val_save_dir):
-                        os.makedirs(val_save_dir)
-
-                    original_image = (
-                        lambda image_url_or_path: load_image(image_url_or_path)
-                        if urlparse(image_url_or_path).scheme
-                        else Image.open(image_url_or_path).convert("RGB")
-                    )(args.val_image_url_or_path)
-                    with torch.autocast(
-                        accelerator.device.type,
-                        enabled=accelerator.mixed_precision == "fp16",
-                    ):
-                        edited_images = []
-                        for val_img_idx in range(args.num_validation_images):
-                            a_val_img = pipeline(
-                                args.validation_prompt,
-                                image=original_image,
-                                num_inference_steps=20,
-                                image_guidance_scale=1.5,
-                                guidance_scale=7,
-                                generator=generator,
-                            ).images[0]
-                            edited_images.append(a_val_img)
-                            a_val_img.save(
-                                os.path.join(
-                                    val_save_dir,
-                                    f"step_{global_step}_val_img_{val_img_idx}.png",
-                                )
-                            )
-
-                    for tracker in accelerator.trackers:
-                        if tracker.name == "wandb":
-                            wandb_table = wandb.Table(columns=WANDB_TABLE_COL_NAMES)
-                            for edited_image in edited_images:
-                                wandb_table.add_data(
-                                    wandb.Image(original_image),
-                                    wandb.Image(edited_image),
-                                    args.validation_prompt,
-                                )
-                            tracker.log({"validation": wandb_table})
-                    if args.use_ema:
-                        # Switch back to the original UNet parameters.
-                        ema_unet.restore(unet.parameters())
-
-                    del pipeline
-                    torch.cuda.empty_cache()
-            ### END: Perform validation every `validation_epochs` steps
 
             if global_step >= args.max_train_steps:
                 break
