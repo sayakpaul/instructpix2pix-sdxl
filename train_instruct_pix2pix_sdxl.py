@@ -887,6 +887,8 @@ def main():
                 # So, first, convert images to latent space.
                 if args.pretrained_vae_model_name_or_path is not None:
                     edited_pixel_values = batch["edited_image"].to(dtype=weight_dtype)
+                    if vae.dtype != weight_dtype:
+                        vae.to(dtype=weight_dtype)
                 else:
                     edited_pixel_values = batch["edited_image"]
                 edited_pixel_values = edited_pixel_values.to(accelerator.device, non_blocking=True)
@@ -1090,7 +1092,7 @@ def main():
                         else Image.open(image_url_or_path).convert("RGB")
                     )(args.val_image_url_or_path)
                     with torch.autocast(
-                        str(accelerator.device).replace(":0", ""),
+                        accelerator.device.type,
                         enabled=accelerator.mixed_precision == "fp16",
                     ):
                         edited_images = []
