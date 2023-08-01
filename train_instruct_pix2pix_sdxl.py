@@ -628,6 +628,7 @@ def main():
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
+    args.global_batch_size = args.per_gpu_batch_size * accelerator.num_processes
     train_dataloader = get_dataloader(args)
 
     # For mixed precision training we cast the text_encoder and vae weights to half-precision
