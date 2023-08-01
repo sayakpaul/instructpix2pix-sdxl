@@ -62,7 +62,7 @@ PROGRAM="train_instruct_pix2pix_sdxl.py \
     --enable_xformers_memory_efficient_attention \
     --resolution=256 --random_flip \
     --per_gpu_batch_size=16 --gradient_accumulation_steps=4 \
-    --num_workers=48 \
+    --num_workers=4 \
     --max_train_steps=10000 \
     --checkpointing_steps=2500 \
     --learning_rate=1e-5 --lr_warmup_steps=0 \
