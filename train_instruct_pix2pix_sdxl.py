@@ -209,10 +209,22 @@ def parse_args():
         help="whether to randomly flip images horizontally",
     )
     parser.add_argument(
-        "--train_batch_size",
+        "--per_gpu_batch_size",
         type=int,
-        default=16,
+        default=8,
         help="Batch size (per device) for the training dataloader.",
+    )
+    parser.add_argument(
+        "--global_batch_size",
+        type=int,
+        default=64,
+        help="Global batch size.",
+    )
+    parser.add_argument(
+        "--num_train_examples",
+        type=int,
+        default=313010,
+        help="Number of training examples.",
     )
     parser.add_argument("--num_train_epochs", type=int, default=100)
     parser.add_argument(
@@ -292,7 +304,7 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--dataloader_num_workers",
+        "--num_workers",
         type=int,
         default=0,
         help=(
