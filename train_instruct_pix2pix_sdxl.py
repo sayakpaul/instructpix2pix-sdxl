@@ -787,10 +787,9 @@ def main():
         num_training_steps=args.max_train_steps * args.gradient_accumulation_steps,
     )
 
-    # Prepare everything with our `accelerator`.
-    unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, optimizer, train_dataloader, lr_scheduler
-    )
+    # Prepare everything with our `accelerator` except the `train_dataloader` since it's already
+    # prepared by webdataset.
+    unet, optimizer, lr_scheduler = accelerator.prepare(unet, optimizer, lr_scheduler)
 
     if args.use_ema:
         ema_unet.to(accelerator.device)
