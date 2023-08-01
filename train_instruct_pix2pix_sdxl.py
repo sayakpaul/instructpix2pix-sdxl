@@ -812,6 +812,7 @@ def main():
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
+        logger.info("Preparing trackers")
         accelerator.init_trackers("instruct-pix2pix-sdxl", config=vars(args))
 
     # Train!
