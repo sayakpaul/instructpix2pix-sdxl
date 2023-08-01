@@ -42,8 +42,12 @@ def get_dataloader(args):
     # Preprocessing the datasets.
     train_transforms = transforms.Compose(
         [
-            transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
-            transforms.RandomHorizontalFlip() if args.random_flip else transforms.Lambda(lambda x: x),
+            transforms.CenterCrop(args.resolution)
+            if args.center_crop
+            else transforms.RandomCrop(args.resolution),
+            transforms.RandomHorizontalFlip()
+            if args.random_flip
+            else transforms.Lambda(lambda x: x),
         ]
     )
 
@@ -51,7 +55,10 @@ def get_dataloader(args):
         # We need to ensure that the original and the edited images undergo the same
         # augmentation transforms.
         images = torch.stack(
-            [transforms.ToTensor()(sample["original_image"]), transforms.ToTensor()(sample["edited_image"])]
+            [
+                transforms.ToTensor()(sample["original_image"]),
+                transforms.ToTensor()(sample["edited_image"]),
+            ]
         )
         transformed_images = train_transforms(images)
 
@@ -59,7 +66,11 @@ def get_dataloader(args):
         original_image, edited_image = transformed_images.chunk(2)
         original_image = original_image.squeeze(0)
         edited_image = edited_image.squeeze(0)
-        return {"original_image": original_image, "edited_image": edited_image, "edit_prompt": sample["edit_prompt"]}
+        return {
+            "original_image": original_image,
+            "edited_image": edited_image,
+            "edit_prompt": sample["edit_prompt"],
+        }
 
     dataset = (
         wds.WebDataset(args.dataset_path, resampled=True, handler=wds.warn_and_continue)
@@ -73,7 +84,13 @@ def get_dataloader(args):
             handler=wds.warn_and_continue,
         )
         .map(
-            filter_keys({args.original_image_column, args.edit_prompt_column, args.edited_image_column}),
+            filter_keys(
+                {
+                    args.original_image_column,
+                    args.edit_prompt_column,
+                    args.edited_image_column,
+                }
+            ),
             handler=wds.warn_and_continue,
         )
         .map(preprocess_images, handler=wds.warn_and_continue)
