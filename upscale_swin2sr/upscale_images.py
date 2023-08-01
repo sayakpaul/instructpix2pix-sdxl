@@ -3,7 +3,7 @@ from swin2sr.models.network_swin2sr import Swin2SR as net
 from datasets import Dataset, Features
 from datasets import Image as ImageFeature
 from datasets import Value
-import numpy as np 
+import numpy as np
 import PIL
 import os
 import requests
@@ -23,36 +23,56 @@ BATCH_SIZE = 64
 DATASET_NAME = "timbrooks/instructpix2pix-clip-filtered"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
 
+
 def download_model_weights() -> None:
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    url = 'https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/{}'.format(os.path.basename(model_path))
+    url = "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/{}".format(
+        os.path.basename(MODEL_PATH)
+    )
     r = requests.get(url, allow_redirects=True)
-    with open(MODEL_PATH, 'wb') as f:
+    with open(MODEL_PATH, "wb") as f:
         f.write(r.content)
+
 
 def load_model() -> torch.nn.Module:
     if not os.path.exists(MODEL_PATH):
         download_model_weights()
-    model = net(upscale=SCALE, in_chans=3, img_size=64, window_size=8,
-        img_range=1., depths=[6, 6, 6, 6, 6, 6], embed_dim=180, num_heads=[6, 6, 6, 6, 6, 6],
-        mlp_ratio=2, upsampler='nearest+conv', resi_connection='1conv'
+    model = net(
+        upscale=SCALE,
+        in_chans=3,
+        img_size=64,
+        window_size=8,
+        img_range=1.0,
+        depths=[6, 6, 6, 6, 6, 6],
+        embed_dim=180,
+        num_heads=[6, 6, 6, 6, 6, 6],
+        mlp_ratio=2,
+        upsampler="nearest+conv",
+        resi_connection="1conv",
     )
     pretrained_model = torch.load(MODEL_PATH)
-    model.load_state_dict(pretrained_model[PARAM_KEY_G] if PARAM_KEY_G in pretrained_model.keys() else pretrained_model, strict=True)
+    model.load_state_dict(
+        pretrained_model[PARAM_KEY_G]
+        if PARAM_KEY_G in pretrained_model.keys()
+        else pretrained_model,
+        strict=True,
+    )
     return model
+
 
 def preprocesss_image(image: PIL.Image.Image) -> torch.FloatTensor:
     image = image.resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
-    image = np.array(image).astype("float32") / 255.
-    image = image[:, :, [2, 1, 0]], (2, 0, 1) # HWC -> CHW
+    image = np.array(image).astype("float32") / 255.0
+    image = image[:, :, [2, 1, 0]], (2, 0, 1)  # HWC -> CHW
     img_lq = torch.from_numpy(image)
-    
+
     _, _, h_old, w_old = img_lq.size()
     h_pad = (h_old // WINDOW_SIZE + 1) * WINDOW_SIZE - h_old
     w_pad = (w_old // WINDOW_SIZE + 1) * WINDOW_SIZE - w_old
-    img_lq = torch.cat([img_lq, torch.flip(img_lq, [2])], 2)[:, :, :h_old + h_pad, :]
-    img_lq = torch.cat([img_lq, torch.flip(img_lq, [3])], 3)[:, :, :, :w_old + w_pad]
+    img_lq = torch.cat([img_lq, torch.flip(img_lq, [2])], 2)[:, :, : h_old + h_pad, :]
+    img_lq = torch.cat([img_lq, torch.flip(img_lq, [3])], 3)[:, :, :, : w_old + w_pad]
     return image
+
 
 def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
     output = output.data.float().cpu().clamp_(0, 1).numpy()
@@ -60,7 +80,10 @@ def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
     output = output.transpose(1, 2, 0)
     return PIL.Image.fromarray(output)
 
-def gen_examples(original_prompts, original_images, edit_prompts, edited_prompts, edited_images):
+
+def gen_examples(
+    original_prompts, original_images, edit_prompts, edited_prompts, edited_images
+):
     def fn():
         for i in range(len(original_prompts)):
             yield {
@@ -73,6 +96,7 @@ def gen_examples(original_prompts, original_images, edit_prompts, edited_prompts
 
     return fn
 
+
 if __name__ == "__main__":
     dataset = datasets.load_dataset(DATASET_NAME, split="train")
     print(f"Dataset has got {len(dataset)} samples.")
@@ -81,17 +105,21 @@ if __name__ == "__main__":
     print("Model loaded.")
 
     def pp(examples):
-        examples["original_image"] = [preprocesss_image(image) for image in examples["original_image"]]
-        examples["edited_images"] = [preprocesss_image(image) for image in examples["edited_image"]]
+        examples["original_image"] = [
+            preprocesss_image(image) for image in examples["original_image"]
+        ]
+        examples["edited_images"] = [
+            preprocesss_image(image) for image in examples["edited_image"]
+        ]
         examples["original_prompt"] = [prompt for prompt in examples["original_prompt"]]
         examples["edit_prompt"] = [prompt for prompt in examples["edit_prompt"]]
         examples["edited_prompt"] = [prompt for prompt in examples["edited_prompt"]]
         return examples
-    
+
     dataset = dataset.with_transform(pp)
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, pin_memory=True)
     print("Dataloader prepared.")
-    
+
     all_upscaled_original_paths = []
     all_upscaled_edited_paths = []
     all_original_prompts = []
@@ -104,14 +132,20 @@ if __name__ == "__main__":
             original_images = [postprocess_image(image) for image in original_images]
             edited_images = model(batch["edited_image"].to("cuda"))
             edited_images = [postprocess_image(image) for image in edited_images]
-            
+
             all_original_prompts += [prompt for prompt in batch["original_prompt"]]
             all_edit_prompts += [prompt for prompt in batch["edit_prompt"]]
             all_edited_prompts += [prompt for prompt in batch["edited_prompt"]]
 
-            orig_img_paths = [os.path.join(tmpdir, f"{idx}_{i}_original_img.png") for i in len(original_images)]
+            orig_img_paths = [
+                os.path.join(tmpdir, f"{idx}_{i}_original_img.png")
+                for i in len(original_images)
+            ]
             all_upscaled_original_paths += [path for path in orig_img_paths]
-            edited_img_paths = [os.path.join(tmpdir, f"{idx}_{i}_edited_img.png") for i in len(edited_images)]
+            edited_img_paths = [
+                os.path.join(tmpdir, f"{idx}_{i}_edited_img.png")
+                for i in len(edited_images)
+            ]
             all_upscaled_edited_paths += [path for path in edited_img_paths]
 
             for i in range(len(orig_img_paths)):
@@ -119,9 +153,11 @@ if __name__ == "__main__":
                 edited_images[i].save(edited_img_paths[i])
 
     generator_fn = gen_examples(
-        original_prompts=all_original_prompts, original_images=all_upscaled_original_paths, 
-        edit_prompts=all_edit_prompts, edited_prompts=all_edited_prompts,
-        edited_images=all_upscaled_edited_paths
+        original_prompts=all_original_prompts,
+        original_images=all_upscaled_original_paths,
+        edit_prompts=all_edit_prompts,
+        edited_prompts=all_edited_prompts,
+        edited_images=all_upscaled_edited_paths,
     )
     ds = Dataset.from_generator(
         generator_fn,
@@ -134,4 +170,3 @@ if __name__ == "__main__":
         ),
     )
     ds.push_to_hub(NEW_DATASET_NAME)
-
