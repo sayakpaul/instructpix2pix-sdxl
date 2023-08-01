@@ -217,12 +217,6 @@ def parse_args():
         help="Batch size (per device) for the training dataloader.",
     )
     parser.add_argument(
-        "--global_batch_size",
-        type=int,
-        default=64,
-        help="Global batch size.",
-    )
-    parser.add_argument(
         "--num_train_examples",
         type=int,
         default=313010,
