@@ -601,7 +601,7 @@ def main():
         args.learning_rate = (
             args.learning_rate
             * args.gradient_accumulation_steps
-            * args.train_batch_size
+            * args.per_gpu_batch_size
             * accelerator.num_processes
         )
 
@@ -759,7 +759,7 @@ def main():
     null_conditioning = compute_null_conditioning()
 
     # The additional inputs needed by the SDXL UNet.
-    def compute_time_ids():
+    def compute_time_ids(batch_size):
         crops_coords_top_left = (
             args.crops_coords_top_left_h,
             args.crops_coords_top_left_w,
@@ -767,9 +767,7 @@ def main():
         original_size = target_size = (args.resolution, args.resolution)
         add_time_ids = list(original_size + crops_coords_top_left + target_size)
         add_time_ids = torch.tensor([add_time_ids], dtype=weight_dtype)
-        return add_time_ids.to(accelerator.device).repeat(args.train_batch_size, 1)
-
-    add_time_ids = compute_time_ids()
+        return add_time_ids.to(accelerator.device).repeat(batch_size, 1)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
@@ -817,7 +815,7 @@ def main():
 
     # Train!
     total_batch_size = (
-        args.train_batch_size
+        args.per_gpu_batch_size
         * accelerator.num_processes
         * args.gradient_accumulation_steps
     )
@@ -825,7 +823,7 @@ def main():
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {train_dataloader.num_samples}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
+    logger.info(f"  Instantaneous batch size per device = {args.per_gpu_batch_size}")
     logger.info(
         f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
     )
@@ -913,11 +911,11 @@ def main():
 
                 # Pack SDXL conditions.
                 prompt_embeds, pooled_prompt_embeds = compute_embeddings_for_prompts(
-                    batch["edit_prompt", text_encoders, tokenizers]
+                    batch["edit_prompt"], text_encoders, tokenizers
                 )
                 added_cond_kwargs = {
                     "text_embeds": pooled_prompt_embeds,
-                    "time_ids": add_time_ids,
+                    "time_ids": compute_time_ids(batch_size=len(batch["edit_prompt"])),
                 }
 
                 # Get the additional image embedding for conditioning.
@@ -986,10 +984,6 @@ def main():
                 ).sample
                 loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
-                # Gather the losses across all processes for logging (if we use distributed training).
-                avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
-                train_loss += avg_loss.item() / args.gradient_accumulation_steps
-
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
@@ -1004,8 +998,6 @@ def main():
                     ema_unet.step(unet.parameters())
                 progress_bar.update(1)
                 global_step += 1
-                accelerator.log({"train_loss": train_loss}, step=global_step)
-                train_loss = 0.0
 
                 if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
@@ -1050,6 +1042,7 @@ def main():
                 "lr": lr_scheduler.get_last_lr()[0],
             }
             progress_bar.set_postfix(**logs)
+            accelerator.log(logs, step=global_step)
 
             ### BEGIN: Perform validation every `validation_epochs` steps
             if global_step % args.validation_steps == 0 or global_step == 1:
