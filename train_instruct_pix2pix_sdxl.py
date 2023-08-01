@@ -871,16 +871,6 @@ def main():
         unet.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
-            # Skip steps until we reach the resumed step
-            if (
-                args.resume_from_checkpoint
-                and epoch == first_epoch
-                and step < resume_step
-            ):
-                if step % args.gradient_accumulation_steps == 0:
-                    progress_bar.update(1)
-                continue
-
             with accelerator.accumulate(unet):
                 # We want to learn the denoising process w.r.t the edited images which
                 # are conditioned on the original image (which was edited) and the edit instruction.
