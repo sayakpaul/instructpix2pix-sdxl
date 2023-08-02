@@ -29,6 +29,7 @@ WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
 BATCH_SIZE = 32
 
+NUM_SAMPLES = 313010
 NUM_WORKERS = 4
 
 DATASET_PATH = "pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -"
@@ -138,7 +139,7 @@ def get_dataloader(num_workers):
         .map(preprocess_images, handler=wds.warn_and_continue)
         .batched(BATCH_SIZE, partial=True, collation_fn=default_collate)
     )
-    dataloader = torch.utils.data.DataLoader(
+    dataloader = wds.WebLoader(
         dataset,
         batch_size=None,
         shuffle=False,
@@ -146,6 +147,7 @@ def get_dataloader(num_workers):
         pin_memory=True,
         persistent_workers=True,
     )
+    dataloader = dataloader.ddp_equalize(NUM_SAMPLES // BATCH_SIZE)
     return dataloader
 
 
