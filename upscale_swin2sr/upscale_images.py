@@ -234,7 +234,6 @@ if __name__ == "__main__":
 
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        print(len(all_upscaled_original_paths), len(all_upscaled_edited_paths), len(all_edit_prompts), len(all_original_prompts))
         generator_fn = gen_examples(
             original_prompts=all_original_prompts,
             original_images=all_upscaled_original_paths,
@@ -251,5 +250,3 @@ if __name__ == "__main__":
             ),
         )
         ds.push_to_hub(NEW_DATASET_NAME)
-
-    accelerator.end_training()
