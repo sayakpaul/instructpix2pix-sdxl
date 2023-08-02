@@ -17,7 +17,7 @@ def filter_keys(key_set):
     return _f
 
 def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
-    output = output.data.float().cpu().clamp_(0, 1).numpy()
+    output = output.float().cpu().clamp_(0, 1).numpy()
     output = (output * 255).round().astype("uint8")
     output = output.transpose(1, 2, 0)  # CHW -> HWC
     return PIL.Image.fromarray(output)
@@ -103,6 +103,7 @@ if __name__ == "__main__":
     for i in range(len(sample)):
         if i == 5:
             break
+        print(sample["original_image"][i].shape)
         original_image = postprocess_image(sample["original_image"][i])
         edited_image = postprocess_image(sample["edited_image"][i])
         original_image.save(os.path.join(folder_path, f"{i}_original.png"))
