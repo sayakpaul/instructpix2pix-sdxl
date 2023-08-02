@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
-            print(batch["original_image"].shape, batch["edited_image"].shape)
+            # print(batch["original_image"].shape, batch["edited_image"].shape)
             original_images = model(batch["original_image"].to("cuda"))
             original_images = [postprocess_image(image) for image in original_images]
             edited_images = model(batch["edited_image"].to("cuda"))
@@ -144,12 +144,12 @@ if __name__ == "__main__":
 
             orig_img_paths = [
                 os.path.join(tmpdir, f"{idx}_{i}_original_img.png")
-                for i in len(original_images)
+                for i in range(len(original_images))
             ]
             all_upscaled_original_paths += [path for path in orig_img_paths]
             edited_img_paths = [
                 os.path.join(tmpdir, f"{idx}_{i}_edited_img.png")
-                for i in len(edited_images)
+                for i in range(len(edited_images))
             ]
             all_upscaled_edited_paths += [path for path in edited_img_paths]
 
