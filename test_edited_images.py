@@ -2,7 +2,7 @@ import torch
 import torchvision.transforms as transforms 
 import webdataset as wds
 from torch.utils.data import default_collate
-import huggingface_hub as create_repo, HfApi
+from huggingface_hub import create_repo, upload_folder
 import PIL
 import os
 
@@ -107,6 +107,5 @@ if __name__ == "__main__":
         edited_image = postprocess_image(sample["edited_image"][i])
         original_image.save(os.path.join(folder_path, f"{i}_original.png"))
         edited_image.save(os.path.join(folder_path, f"{i}_edited.png"))
-
-    api = HfApi()
-    api.upload_folder(repo_id=repo_id, folder_path=folder_path, repo_type="dataset")
+    
+    upload_folder(repo_id=repo_id, folder_path=folder_path, repo_type="dataset")
