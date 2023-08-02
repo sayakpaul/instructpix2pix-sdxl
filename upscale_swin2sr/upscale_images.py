@@ -172,7 +172,9 @@ if __name__ == "__main__":
     )
     accelerator = Accelerator(project_config=accelerator_project_config)
 
-    model = load_model().eval()
+    if accelerator.is_main_process:
+        model = load_model().eval()
+        print("Model loaded.")
     model = accelerator.prepare(model)
 
     dataloader = get_dataloader(
@@ -180,6 +182,7 @@ if __name__ == "__main__":
         num_workers=NUM_WORKERS,
         num_train_examples=NUM_TRAINING_EXAMPLES,
     )
+    print("Dataloader prepared.")
 
     all_upscaled_original_paths = []
     all_upscaled_edited_paths = []
