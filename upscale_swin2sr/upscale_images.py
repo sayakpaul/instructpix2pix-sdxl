@@ -36,7 +36,7 @@ NUM_TRAINING_EXAMPLES = 313010
 
 DATASET_PATH = "pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
-PROJECT_DIR = PROJECT_DIR
+PROJECT_DIR = "/scratch"
 
 
 def download_model_weights() -> None:
