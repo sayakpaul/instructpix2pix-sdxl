@@ -204,10 +204,7 @@ if __name__ == "__main__":
         )
 
         # Inference.
-        with torch.autocast(
-            device_type=accelerator.device.type, dtype=torch.float16
-        ):
-            output_images = model(images)
+        output_images = model(images)
 
         # Post-process.
         original_images, edited_images = output_images.chunk(2)
