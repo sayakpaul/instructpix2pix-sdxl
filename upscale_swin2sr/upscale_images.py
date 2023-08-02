@@ -24,7 +24,7 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 96
+BATCH_SIZE = 512
 
 DATASET_NAME = "timbrooks/instructpix2pix-clip-filtered"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
@@ -114,7 +114,6 @@ if __name__ == "__main__":
         num_gpus = torch.cuda.device_count()
         print(f"Using {num_gpus} GPUs.")
         model = torch.nn.DataParallel(model, device_ids=list(range(num_gpus)))
-        BATCH_SIZE *= num_gpus
     model = model.eval().cuda()
     print("Model loaded.")
 
