@@ -80,29 +80,8 @@ def filter_keys(key_set):
 
     return _f
 
-# Copied from 
-# https://github.com/webdataset/webdataset-imagenet/blob/main/imagenet.py
-def nodesplitter(src, group=None):
-    if torch.distributed.is_initialized():
-        if group is None:
-            group = torch.distributed.group.WORLD
-        rank = torch.distributed.get_rank(group=group)
-        size = torch.distributed.get_world_size(group=group)
-        print(f"nodesplitter: rank={rank} size={size}")
-        count = 0
-        for i, item in enumerate(src):
-            if i % size == rank:
-                yield item
-                count += 1
-        print(f"nodesplitter: rank={rank} size={size} count={count} DONE")
-    else:
-        yield from src
-
 
 def get_dataloader():
-    # num_worker_batches = math.ceil(
-    #     NUM_SAMPLES / (accelerator.num_processes * NUM_WORKERS)
-    # )
     resize = transforms.Resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
 
     def preprocess_images(sample):
@@ -143,7 +122,7 @@ def get_dataloader():
         }
 
     dataset = (
-        wds.WebDataset(DATASET_PATH, nodesplitter=nodesplitter, handler=wds.warn_and_continue)
+        wds.WebDataset(DATASET_PATH, handler=wds.warn_and_continue)
         .decode("pil", handler=wds.warn_and_continue)
         .rename(
             original_prompt="original_prompt.txt",
@@ -161,7 +140,7 @@ def get_dataloader():
         .map(preprocess_images, handler=wds.warn_and_continue)
         .batched(BATCH_SIZE, partial=True, collation_fn=default_collate)
     )
-    loader = wds.WebLoader(
+    loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=None,
         shuffle=False,
@@ -169,7 +148,6 @@ def get_dataloader():
         pin_memory=True,
         persistent_workers=True,
     )
-
     return loader
 
 
