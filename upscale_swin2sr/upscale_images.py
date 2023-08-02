@@ -10,6 +10,7 @@ from datasets import Image as ImageFeature
 from datasets import Value
 import PIL
 import os
+import math
 import requests
 import torch
 from accelerate.utils import ProjectConfiguration
@@ -81,7 +82,9 @@ def filter_keys(key_set):
 
 
 def get_dataloader(accelerator):
-    num_worker_batches = NUM_SAMPLES / (accelerator.num_processes * NUM_WORKERS)
+    num_worker_batches = math.ceil(
+        NUM_SAMPLES / (accelerator.num_processes * NUM_WORKERS)
+    )
     resize = transforms.Resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
 
     def preprocess_images(sample):
@@ -149,7 +152,7 @@ def get_dataloader(accelerator):
         pin_memory=True,
         persistent_workers=True,
     )
-    
+
     return loader
 
 
@@ -160,9 +163,7 @@ def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
     return PIL.Image.fromarray(output)
 
 
-def gen_examples(
-    original_prompts, original_images, edit_prompts, edited_images
-):
+def gen_examples(original_prompts, original_images, edit_prompts, edited_images):
     def fn():
         for i in range(len(original_prompts)):
             yield {

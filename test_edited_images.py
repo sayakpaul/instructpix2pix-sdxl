@@ -1,5 +1,5 @@
-import torch 
-import torchvision.transforms as transforms 
+import torch
+import torchvision.transforms as transforms
 import webdataset as wds
 from torch.utils.data import default_collate
 from huggingface_hub import create_repo, upload_folder
@@ -10,11 +10,13 @@ DOWNSAMPLE_TO = 256
 BATCH_SIZE = 64
 DATASET_PATH = "pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -"
 
+
 def filter_keys(key_set):
     def _f(dictionary):
         return {k: v for k, v in dictionary.items() if k in key_set}
 
     return _f
+
 
 def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
     output = output.float().cpu().clamp_(0, 1).numpy()
@@ -92,24 +94,27 @@ def get_dataloader(num_workers):
     )
     return dataloader
 
+
 if __name__ == "__main__":
     folder_path = "sample_images"
     os.makedirs(folder_path, exist_ok=True)
 
     dataloader = get_dataloader(4)
     for sample in dataloader:
-        break 
-    
-    repo_id = create_repo(repo_id="pipe-instructpix2pix", repo_type="dataset", exist_ok=True).repo_id
+        break
+
+    repo_id = create_repo(
+        repo_id="pipe-instructpix2pix", repo_type="dataset", exist_ok=True
+    ).repo_id
     for i in range(len(sample)):
         if i == 5:
             break
-        
+
         original_image = postprocess_image(sample["original_image"][i].squeeze())
         edited_image = postprocess_image(sample["edited_image"][i].squeeze())
         orig_path = os.path.join(folder_path, f"{i}_original.png")
         edited_path = os.path.join(folder_path, f"{i}_edited.png")
         original_image.save(orig_path)
         edited_image.save(edited_path)
-    
+
     upload_folder(repo_id=repo_id, folder_path=folder_path, repo_type="dataset")
