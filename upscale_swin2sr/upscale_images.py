@@ -16,6 +16,7 @@ from tqdm import tqdm
 torch.set_grad_enabled(False)
 
 import torch.backends.cudnn as cudnn
+
 cudnn.benchmark = True
 
 MODEL_PATH = "model_zoo/swin2sr/Swin2SR_RealworldSR_X4_64_BSRGAN_PSNR.pth"
@@ -141,7 +142,9 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
-            original_images = model(batch["original_image"].to("cuda", non_blocking=True))
+            original_images = model(
+                batch["original_image"].to("cuda", non_blocking=True)
+            )
             original_images = [postprocess_image(image) for image in original_images]
             edited_images = model(batch["edited_image"].to("cuda", non_blocking=True))
             edited_images = [postprocess_image(image) for image in edited_images]
