@@ -28,13 +28,13 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 
 NUM_WORKERS = 4
 
 DATASET_PATH = "pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
-PROJECT_DIR = "/scratch"
+PROJECT_DIR = "/scratch/sayak"
 
 
 def download_model_weights() -> None:
@@ -191,51 +191,51 @@ if __name__ == "__main__":
     all_original_prompts = []
     all_edit_prompts = []
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        for idx, batch in enumerate(tqdm(dataloader)):
-            if idx == 1:
-                break
-            # Collate the original and edited images so that we do only a single
-            # forward pass.
-            images = [image for image in batch["original_image"]]
-            images += [image for image in batch["edited_image"]]
-            images = torch.stack(images).to(
-                accelerator.device,
-                memory_format=torch.contiguous_format,
-                non_blocking=True,
-            )
+    for idx, batch in enumerate(tqdm(dataloader)):
+        if idx == 1:
+            break
+        # Collate the original and edited images so that we do only a single
+        # forward pass.
+        images = [image for image in batch["original_image"]]
+        images += [image for image in batch["edited_image"]]
+        images = torch.stack(images).to(
+            accelerator.device,
+            memory_format=torch.contiguous_format,
+            non_blocking=True,
+        )
 
-            # Inference.
-            with torch.autocast(
-                device_type=accelerator.device.type, dtype=torch.float16
-            ):
-                output_images = model(images).float()
+        # Inference.
+        with torch.autocast(
+            device_type=accelerator.device.type, dtype=torch.float16
+        ):
+            output_images = model(images).float()
 
-            # Post-process.
-            original_images, edited_images = output_images.chunk(2)
-            original_images = [postprocess_image(image) for image in original_images]
-            edited_images = [postprocess_image(image) for image in edited_images]
+        # Post-process.
+        original_images, edited_images = output_images.chunk(2)
+        original_images = [postprocess_image(image) for image in original_images]
+        edited_images = [postprocess_image(image) for image in edited_images]
 
-            all_original_prompts += [prompt for prompt in batch["original_prompt"]]
-            all_edit_prompts += [prompt for prompt in batch["edit_prompt"]]
+        all_original_prompts += [prompt for prompt in batch["original_prompt"]]
+        all_edit_prompts += [prompt for prompt in batch["edit_prompt"]]
 
-            orig_img_paths = [
-                os.path.join(PROJECT_DIR, tmpdir, f"{idx}_{i}_original_img.png")
-                for i in range(len(original_images))
-            ]
-            all_upscaled_original_paths += [path for path in orig_img_paths]
-            edited_img_paths = [
-                os.path.join(PROJECT_DIR, tmpdir, f"{idx}_{i}_edited_img.png")
-                for i in range(len(edited_images))
-            ]
-            all_upscaled_edited_paths += [path for path in edited_img_paths]
+        orig_img_paths = [
+            os.path.join(PROJECT_DIR, f"{idx}_{i}_original_img.png")
+            for i in range(len(original_images))
+        ]
+        all_upscaled_original_paths += [path for path in orig_img_paths]
+        edited_img_paths = [
+            os.path.join(PROJECT_DIR, f"{idx}_{i}_edited_img.png")
+            for i in range(len(edited_images))
+        ]
+        all_upscaled_edited_paths += [path for path in edited_img_paths]
 
-            for i in range(len(orig_img_paths)):
-                original_images[i].save(orig_img_paths[i])
-                edited_images[i].save(edited_img_paths[i])
+        for i in range(len(orig_img_paths)):
+            original_images[i].save(orig_img_paths[i])
+            edited_images[i].save(edited_img_paths[i])
 
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
+        print(len(all_upscaled_original_paths), len(all_upscaled_edited_paths), len(all_edit_prompts), len(all_original_prompts))
         generator_fn = gen_examples(
             original_prompts=all_original_prompts,
             original_images=all_upscaled_original_paths,
