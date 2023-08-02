@@ -3,7 +3,6 @@ from swin2sr.models.network_swin2sr import Swin2SR as net
 import torch
 import webdataset as wds
 from torch.utils.data import default_collate
-import math
 from torchvision import transforms
 
 from datasets import Dataset, Features
@@ -32,7 +31,6 @@ DOWNSAMPLE_TO = 256
 BATCH_SIZE = 64
 
 NUM_WORKERS = 4
-NUM_TRAINING_EXAMPLES = 313010
 
 DATASET_PATH = "pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
@@ -82,10 +80,7 @@ def filter_keys(key_set):
     return _f
 
 
-def get_dataloader(global_batch_size, num_workers, num_train_examples):
-    num_worker_batches = math.ceil(
-        num_train_examples / (global_batch_size * num_workers)
-    )  # per dataloader worker
+def get_dataloader(num_workers):
     resize = transforms.Resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
 
     def preprocess_images(sample):
@@ -187,11 +182,7 @@ if __name__ == "__main__":
     model = load_model().eval()
     model = accelerator.prepare(model)
 
-    dataloader = get_dataloader(
-        global_batch_size=BATCH_SIZE * accelerator.num_processes,
-        num_workers=NUM_WORKERS,
-        num_train_examples=NUM_TRAINING_EXAMPLES,
-    )
+    dataloader = get_dataloader(num_workers=NUM_WORKERS)
     if accelerator.is_main_process:
         print("Model loaded.")
         print("Dataloader prepared.")
@@ -204,13 +195,25 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
-            original_images = model(
-                batch["original_image"].to(accelerator.device, non_blocking=True)
+            # Collate the original and edited images so that we do only a single
+            # forward pass.
+            images = [image for image in batch["original_image"]]
+            images += [image for image in batch["edited_image"]]
+            images = torch.stack(images).to(
+                accelerator.device,
+                memory_format=torch.contiguous_format,
+                non_blocking=True,
             )
+
+            # Inference.
+            with torch.autocast(
+                device_type=accelerator.device.type, dtype=torch.float16
+            ):
+                output_images = model(images).float()
+
+            # Post-process.
+            original_images, edited_images = output_images.chunk(2)
             original_images = [postprocess_image(image) for image in original_images]
-            edited_images = model(
-                batch["edited_image"].to(accelerator.device, non_blocking=True)
-            )
             edited_images = [postprocess_image(image) for image in edited_images]
 
             all_original_prompts += [prompt for prompt in batch["original_prompt"]]
