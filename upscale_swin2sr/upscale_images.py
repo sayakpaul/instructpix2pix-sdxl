@@ -64,14 +64,14 @@ def preprocesss_image(image: PIL.Image.Image) -> torch.FloatTensor:
     image = image.resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
     image = np.array(image).astype("float32") / 255.0
     image = np.transpose(image, (2, 0, 1))  # HWC -> CHW
-    img_lq = torch.from_numpy(image)
+    img_lq = torch.from_numpy(image).float().unsqueeze(0)
 
     _, _, h_old, w_old = img_lq.size()
     h_pad = (h_old // WINDOW_SIZE + 1) * WINDOW_SIZE - h_old
     w_pad = (w_old // WINDOW_SIZE + 1) * WINDOW_SIZE - w_old
     img_lq = torch.cat([img_lq, torch.flip(img_lq, [2])], 2)[:, :, : h_old + h_pad, :]
     img_lq = torch.cat([img_lq, torch.flip(img_lq, [3])], 3)[:, :, :, : w_old + w_pad]
-    return image
+    return img_lq.squeeze(0)
 
 
 def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
