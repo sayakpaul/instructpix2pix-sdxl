@@ -10,7 +10,6 @@ from datasets import Image as ImageFeature
 from datasets import Value
 import PIL
 import os
-import math
 import requests
 import torch
 from accelerate.utils import ProjectConfiguration
@@ -28,7 +27,7 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 64
+BATCH_SIZE = 48
 
 NUM_SAMPLES = 313010
 NUM_WORKERS = 4
@@ -204,8 +203,7 @@ if __name__ == "__main__":
         )
 
         # Inference.
-        with torch.autocast(accelerator.device.type, dtype=torch.float16):
-            output_images = model(images)
+        output_images = model(images)
 
         # Post-process.
         original_images, edited_images = output_images.chunk(2)
