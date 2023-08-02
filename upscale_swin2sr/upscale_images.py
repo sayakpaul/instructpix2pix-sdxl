@@ -207,7 +207,7 @@ if __name__ == "__main__":
         with torch.autocast(
             device_type=accelerator.device.type, dtype=torch.float16
         ):
-            output_images = model(images).float()
+            output_images = model(images)
 
         # Post-process.
         original_images, edited_images = output_images.chunk(2)
@@ -251,3 +251,5 @@ if __name__ == "__main__":
             ),
         )
         ds.push_to_hub(NEW_DATASET_NAME)
+
+    accelerator.end_training()
