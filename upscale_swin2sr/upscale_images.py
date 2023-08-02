@@ -75,6 +75,13 @@ def load_model() -> torch.nn.Module:
     return model
 
 
+def filter_keys(key_set):
+    def _f(dictionary):
+        return {k: v for k, v in dictionary.items() if k in key_set}
+
+    return _f
+
+
 def get_dataloader(global_batch_size, num_workers, num_train_examples):
     num_worker_batches = math.ceil(
         num_train_examples / (global_batch_size * num_workers)
@@ -126,6 +133,12 @@ def get_dataloader(global_batch_size, num_workers, num_train_examples):
             original_image="original_image.jpg",
             edit_prompt="edit_prompt.txt",
             edited_image="edited_image.jpg",
+            handler=wds.warn_and_continue,
+        )
+        .map(
+            filter_keys(
+                {"original_image", "edited_image", "edit_prompt", "original_prompt"}
+            ),
             handler=wds.warn_and_continue,
         )
         .map(preprocess_images, handler=wds.warn_and_continue)
