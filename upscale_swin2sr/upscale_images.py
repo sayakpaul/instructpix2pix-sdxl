@@ -115,7 +115,7 @@ if __name__ == "__main__":
         print(f"Using {num_gpus} GPUs.")
         model = torch.nn.DataParallel(model, device_ids=list(range(num_gpus)))
         BATCH_SIZE *= num_gpus
-    model = model.eval().to("cuda")
+    model = model.eval().cuda()
     print("Model loaded.")
 
     def pp(examples):
@@ -142,11 +142,9 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
-            original_images = model(
-                batch["original_image"].to("cuda", non_blocking=True)
-            )
+            original_images = model(batch["original_image"].cuda())
             original_images = [postprocess_image(image) for image in original_images]
-            edited_images = model(batch["edited_image"].to("cuda", non_blocking=True))
+            edited_images = model(batch["edited_image"].cuda())
             edited_images = [postprocess_image(image) for image in edited_images]
 
             all_original_prompts += [prompt for prompt in batch["original_prompt"]]
