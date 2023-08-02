@@ -1,15 +1,20 @@
 from swin2sr.models.network_swin2sr import Swin2SR as net
 
+import torch
+import webdataset as wds
+from torch.utils.data import default_collate
+import math
+from torchvision import transforms
+
 from datasets import Dataset, Features
 from datasets import Image as ImageFeature
 from datasets import Value
-import numpy as np
 import PIL
 import os
 import requests
 import torch
-import datasets
-from torch.utils.data import DataLoader
+from accelerate.utils import ProjectConfiguration
+from accelerate import Accelerator
 import tempfile
 from tqdm import tqdm
 
@@ -24,10 +29,14 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 512
+BATCH_SIZE = 64
 
-DATASET_NAME = "timbrooks/instructpix2pix-clip-filtered"
+NUM_WORKERS = 4
+NUM_TRAINING_EXAMPLES = 313010
+
+DATASET_PATH = "pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
+PROJECT_DIR = PROJECT_DIR
 
 
 def download_model_weights() -> None:
@@ -66,18 +75,72 @@ def load_model() -> torch.nn.Module:
     return model
 
 
-def preprocesss_image(image: PIL.Image.Image) -> torch.FloatTensor:
-    image = image.resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
-    image = np.array(image).astype("float32") / 255.0
-    image = np.transpose(image, (2, 0, 1))  # HWC -> CHW
-    img_lq = torch.from_numpy(image).float().unsqueeze(0)
+def get_dataloader(global_batch_size, num_workers, num_train_examples):
+    num_worker_batches = math.ceil(
+        num_train_examples / (global_batch_size * num_workers)
+    )  # per dataloader worker
+    resize = transforms.Compose(transforms.Resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO)))
 
-    _, _, h_old, w_old = img_lq.size()
-    h_pad = (h_old // WINDOW_SIZE + 1) * WINDOW_SIZE - h_old
-    w_pad = (w_old // WINDOW_SIZE + 1) * WINDOW_SIZE - w_old
-    img_lq = torch.cat([img_lq, torch.flip(img_lq, [2])], 2)[:, :, : h_old + h_pad, :]
-    img_lq = torch.cat([img_lq, torch.flip(img_lq, [3])], 3)[:, :, :, : w_old + w_pad]
-    return img_lq.squeeze(0)
+    def preprocess_images(sample):
+        # We need to ensure that the original and the edited images undergo the same
+        # augmentation transforms.
+        images = torch.stack(
+            [
+                transforms.ToTensor()(sample["original_image"]),
+                transforms.ToTensor()(sample["edited_image"]),
+            ]
+        )
+        transformed_images = resize(images)
+
+        # Separate the original and edited images.
+        original_image, edited_image = transformed_images.chunk(2)
+
+        # Pad the images.
+        def pad(img_lq):
+            _, _, h_old, w_old = img_lq.size()
+            h_pad = (h_old // WINDOW_SIZE + 1) * WINDOW_SIZE - h_old
+            w_pad = (w_old // WINDOW_SIZE + 1) * WINDOW_SIZE - w_old
+            img_lq = torch.cat([img_lq, torch.flip(img_lq, [2])], 2)[
+                :, :, : h_old + h_pad, :
+            ]
+            img_lq = torch.cat([img_lq, torch.flip(img_lq, [3])], 3)[
+                :, :, :, : w_old + w_pad
+            ]
+            return img_lq.squeeze(0)
+
+        original_image = pad(original_image)
+        edited_image = pad(edited_image)
+
+        return {
+            "original_image": original_image,
+            "edited_image": edited_image,
+            "edit_prompt": sample["edit_prompt"],
+            "original_prompt": sample["original_prompt"],
+        }
+
+    dataset = (
+        wds.WebDataset(DATASET_PATH, resampled=True, handler=wds.warn_and_continue)
+        .decode("pil", handler=wds.warn_and_continue)
+        .rename(
+            original_prompt="original_prompt.txt",
+            original_image="original_image.jpg",
+            edit_prompt="edit_prompt.txt",
+            edited_image="edited_image.jpg",
+            handler=wds.warn_and_continue,
+        )
+        .map(preprocess_images, handler=wds.warn_and_continue)
+        .batched(BATCH_SIZE, partial=False, collation_fn=default_collate)
+        .with_epoch(num_worker_batches)
+    )
+    dataloader = wds.WebLoader(
+        dataset,
+        batch_size=None,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+        persistent_workers=True,
+    )
+    return dataloader
 
 
 def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
@@ -104,34 +167,19 @@ def gen_examples(
 
 
 if __name__ == "__main__":
-    dataset = datasets.load_dataset(
-        DATASET_NAME, split="train", num_proc=4, cache_dir="/scratch"
+    accelerator_project_config = ProjectConfiguration(
+        project_dir=PROJECT_DIR, logging_dir=PROJECT_DIR
     )
-    print(f"Dataset has got {len(dataset)} samples.")
+    accelerator = Accelerator(project_config=accelerator_project_config)
 
-    model = load_model()
-    if torch.cuda.device_count() > 1:
-        num_gpus = torch.cuda.device_count()
-        print(f"Using {num_gpus} GPUs.")
-        model = torch.nn.DataParallel(model, device_ids=list(range(num_gpus)))
-    model = model.eval().cuda()
-    print("Model loaded.")
+    model = load_model().eval()
+    model = accelerator.prepare(model)
 
-    def pp(examples):
-        examples["original_image"] = [
-            preprocesss_image(image) for image in examples["original_image"]
-        ]
-        examples["edited_image"] = [
-            preprocesss_image(image) for image in examples["edited_image"]
-        ]
-        examples["original_prompt"] = [prompt for prompt in examples["original_prompt"]]
-        examples["edit_prompt"] = [prompt for prompt in examples["edit_prompt"]]
-        examples["edited_prompt"] = [prompt for prompt in examples["edited_prompt"]]
-        return examples
-
-    dataset = dataset.with_transform(pp)
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, pin_memory=True)
-    print("Dataloader prepared.")
+    dataloader = get_dataloader(
+        global_batch_size=BATCH_SIZE * accelerator.num_processes,
+        num_workers=NUM_WORKERS,
+        num_train_examples=NUM_TRAINING_EXAMPLES,
+    )
 
     all_upscaled_original_paths = []
     all_upscaled_edited_paths = []
@@ -141,9 +189,13 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
-            original_images = model(batch["original_image"].cuda())
+            original_images = model(
+                batch["original_image"].to(accelerator.device, non_blocking=True)
+            )
             original_images = [postprocess_image(image) for image in original_images]
-            edited_images = model(batch["edited_image"].cuda())
+            edited_images = model(
+                batch["edited_image"].to(accelerator.device, non_blocking=True)
+            )
             edited_images = [postprocess_image(image) for image in edited_images]
 
             all_original_prompts += [prompt for prompt in batch["original_prompt"]]
@@ -151,12 +203,12 @@ if __name__ == "__main__":
             all_edited_prompts += [prompt for prompt in batch["edited_prompt"]]
 
             orig_img_paths = [
-                os.path.join("/scratch", tmpdir, f"{idx}_{i}_original_img.png")
+                os.path.join(PROJECT_DIR, tmpdir, f"{idx}_{i}_original_img.png")
                 for i in range(len(original_images))
             ]
             all_upscaled_original_paths += [path for path in orig_img_paths]
             edited_img_paths = [
-                os.path.join("/scratch", tmpdir, f"{idx}_{i}_edited_img.png")
+                os.path.join(PROJECT_DIR, tmpdir, f"{idx}_{i}_edited_img.png")
                 for i in range(len(edited_images))
             ]
             all_upscaled_edited_paths += [path for path in edited_img_paths]
@@ -165,21 +217,23 @@ if __name__ == "__main__":
                 original_images[i].save(orig_img_paths[i])
                 edited_images[i].save(edited_img_paths[i])
 
-    generator_fn = gen_examples(
-        original_prompts=all_original_prompts,
-        original_images=all_upscaled_original_paths,
-        edit_prompts=all_edit_prompts,
-        edited_prompts=all_edited_prompts,
-        edited_images=all_upscaled_edited_paths,
-    )
-    ds = Dataset.from_generator(
-        generator_fn,
-        features=Features(
-            original_prompt=Value("string"),
-            original_image=ImageFeature(),
-            edit_prompt=Value("string"),
-            edited_prompt=Value("string"),
-            edited_image=ImageFeature(),
-        ),
-    )
-    ds.push_to_hub(NEW_DATASET_NAME)
+    accelerator.wait_for_everyone()
+    if accelerator.is_main_process:
+        generator_fn = gen_examples(
+            original_prompts=all_original_prompts,
+            original_images=all_upscaled_original_paths,
+            edit_prompts=all_edit_prompts,
+            edited_prompts=all_edited_prompts,
+            edited_images=all_upscaled_edited_paths,
+        )
+        ds = Dataset.from_generator(
+            generator_fn,
+            features=Features(
+                original_prompt=Value("string"),
+                original_image=ImageFeature(),
+                edit_prompt=Value("string"),
+                edited_prompt=Value("string"),
+                edited_image=ImageFeature(),
+            ),
+        )
+        ds.push_to_hub(NEW_DATASET_NAME)
