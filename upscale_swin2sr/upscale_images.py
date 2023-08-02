@@ -119,6 +119,11 @@ if __name__ == "__main__":
         return examples
 
     dataset = dataset.with_transform(pp)
+    for sample in dataset: 
+        print(type(sample))
+        for k in sample:
+            print(sample[k])
+        break
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, pin_memory=True)
     print("Dataloader prepared.")
 
