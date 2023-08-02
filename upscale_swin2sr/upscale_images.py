@@ -15,6 +15,9 @@ from tqdm import tqdm
 
 torch.set_grad_enabled(False)
 
+import torch.backends.cudnn as cudnn
+cudnn.benchmark = True
+
 MODEL_PATH = "model_zoo/swin2sr/Swin2SR_RealworldSR_X4_64_BSRGAN_PSNR.pth"
 PARAM_KEY_G = "params_ema"
 SCALE = 4
@@ -105,7 +108,13 @@ if __name__ == "__main__":
     )
     print(f"Dataset has got {len(dataset)} samples.")
 
-    model = load_model().eval().to("cuda")
+    model = load_model()
+    if torch.cuda.device_count() > 1:
+        num_gpus = torch.cuda.device_count()
+        print(f"Using {num_gpus} GPUs.")
+        model = torch.nn.DataParallel(model, device_ids=list(range(num_gpus)))
+        BATCH_SIZE *= num_gpus
+    model = model.eval().to("cuda")
     print("Model loaded.")
 
     def pp(examples):
@@ -132,7 +141,6 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
-            # print(batch["original_image"].shape, batch["edited_image"].shape)
             original_images = model(batch["original_image"].to("cuda", non_blocking=True))
             original_images = [postprocess_image(image) for image in original_images]
             edited_images = model(batch["edited_image"].to("cuda", non_blocking=True))
