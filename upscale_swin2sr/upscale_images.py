@@ -151,12 +151,12 @@ if __name__ == "__main__":
             all_edited_prompts += [prompt for prompt in batch["edited_prompt"]]
 
             orig_img_paths = [
-                os.path.join(tmpdir, f"{idx}_{i}_original_img.png")
+                os.path.join("/scratch", tmpdir, f"{idx}_{i}_original_img.png")
                 for i in range(len(original_images))
             ]
             all_upscaled_original_paths += [path for path in orig_img_paths]
             edited_img_paths = [
-                os.path.join(tmpdir, f"{idx}_{i}_edited_img.png")
+                os.path.join("/scratch", tmpdir, f"{idx}_{i}_edited_img.png")
                 for i in range(len(edited_images))
             ]
             all_upscaled_edited_paths += [path for path in edited_img_paths]
