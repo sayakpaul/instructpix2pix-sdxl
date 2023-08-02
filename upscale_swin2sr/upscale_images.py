@@ -144,8 +144,8 @@ def get_dataloader(num_workers):
         batch_size=None,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
-        persistent_workers=True,
+        # pin_memory=True,
+        # persistent_workers=True,
     )
     loader = loader.ddp_equalize(NUM_SAMPLES // BATCH_SIZE)
     return loader
