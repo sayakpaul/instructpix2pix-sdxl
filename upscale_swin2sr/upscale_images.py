@@ -13,6 +13,8 @@ from torch.utils.data import DataLoader
 import tempfile
 from tqdm import tqdm
 
+torch.set_grad_enabled(False)
+
 MODEL_PATH = "model_zoo/swin2sr/Swin2SR_RealworldSR_X4_64_BSRGAN_PSNR.pth"
 PARAM_KEY_G = "params_ema"
 SCALE = 4
@@ -77,7 +79,7 @@ def preprocesss_image(image: PIL.Image.Image) -> torch.FloatTensor:
 def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
     output = output.data.float().cpu().clamp_(0, 1).numpy()
     output = (output * 255).round().astype("uint8")
-    output = output.transpose(1, 2, 0) # CHW -> HWC
+    output = output.transpose(1, 2, 0)  # CHW -> HWC
     return PIL.Image.fromarray(output)
 
 
@@ -119,11 +121,6 @@ if __name__ == "__main__":
         return examples
 
     dataset = dataset.with_transform(pp)
-    for sample in dataset: 
-        print(type(sample))
-        for k in sample:
-            print(k, sample[k], type(sample[k]))
-        break
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, pin_memory=True)
     print("Dataloader prepared.")
 
@@ -133,8 +130,9 @@ if __name__ == "__main__":
     all_edit_prompts = []
     all_edited_prompts = []
 
-    with tempfile.TemporaryDirectory() as tmpdir, torch.no_grad():
+    with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
+            print(batch["original_image"].shape, batch["edited_image"].shape)
             original_images = model(batch["original_image"].to("cuda"))
             original_images = [postprocess_image(image) for image in original_images]
             edited_images = model(batch["edited_image"].to("cuda"))
