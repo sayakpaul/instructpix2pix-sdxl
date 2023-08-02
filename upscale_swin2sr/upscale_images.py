@@ -24,7 +24,7 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 512
+BATCH_SIZE = 1024
 
 DATASET_NAME = "timbrooks/instructpix2pix-clip-filtered"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
