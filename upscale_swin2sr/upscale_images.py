@@ -20,7 +20,7 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 64
+BATCH_SIZE = 256
 
 DATASET_NAME = "timbrooks/instructpix2pix-clip-filtered"
 NEW_DATASET_NAME = "instructpix2pix-clip-filtered-upscaled"
@@ -133,9 +133,9 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
             # print(batch["original_image"].shape, batch["edited_image"].shape)
-            original_images = model(batch["original_image"].to("cuda"))
+            original_images = model(batch["original_image"].to("cuda", non_blocking=True))
             original_images = [postprocess_image(image) for image in original_images]
-            edited_images = model(batch["edited_image"].to("cuda"))
+            edited_images = model(batch["edited_image"].to("cuda", non_blocking=True))
             edited_images = [postprocess_image(image) for image in edited_images]
 
             all_original_prompts += [prompt for prompt in batch["original_prompt"]]
