@@ -14,7 +14,6 @@ import requests
 import torch
 from accelerate.utils import ProjectConfiguration
 from accelerate import Accelerator
-import tempfile
 from tqdm import tqdm
 
 torch.set_grad_enabled(False)
@@ -28,7 +27,7 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 128
+BATCH_SIZE = 96
 
 NUM_WORKERS = 4
 
