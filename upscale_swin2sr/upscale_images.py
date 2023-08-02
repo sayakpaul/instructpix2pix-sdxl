@@ -158,7 +158,7 @@ def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
 
 
 def gen_examples(
-    original_prompts, original_images, edit_prompts, edited_prompts, edited_images
+    original_prompts, original_images, edit_prompts, edited_images
 ):
     def fn():
         for i in range(len(original_prompts)):
@@ -166,7 +166,6 @@ def gen_examples(
                 "original_prompt": original_prompts[i],
                 "original_image": {"path": original_images[i]},
                 "edit_prompt": edit_prompts[i],
-                "edited_prompt": edited_prompts[i],
                 "edited_image": {"path": edited_images[i]},
             }
 
@@ -191,7 +190,6 @@ if __name__ == "__main__":
     all_upscaled_edited_paths = []
     all_original_prompts = []
     all_edit_prompts = []
-    all_edited_prompts = []
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for idx, batch in enumerate(tqdm(dataloader)):
@@ -220,7 +218,6 @@ if __name__ == "__main__":
 
             all_original_prompts += [prompt for prompt in batch["original_prompt"]]
             all_edit_prompts += [prompt for prompt in batch["edit_prompt"]]
-            all_edited_prompts += [prompt for prompt in batch["edited_prompt"]]
 
             orig_img_paths = [
                 os.path.join(PROJECT_DIR, tmpdir, f"{idx}_{i}_original_img.png")
@@ -243,7 +240,6 @@ if __name__ == "__main__":
             original_prompts=all_original_prompts,
             original_images=all_upscaled_original_paths,
             edit_prompts=all_edit_prompts,
-            edited_prompts=all_edited_prompts,
             edited_images=all_upscaled_edited_paths,
         )
         ds = Dataset.from_generator(
@@ -252,7 +248,6 @@ if __name__ == "__main__":
                 original_prompt=Value("string"),
                 original_image=ImageFeature(),
                 edit_prompt=Value("string"),
-                edited_prompt=Value("string"),
                 edited_image=ImageFeature(),
             ),
         )
