@@ -106,7 +106,9 @@ if __name__ == "__main__":
         
         original_image = postprocess_image(sample["original_image"][i].squeeze())
         edited_image = postprocess_image(sample["edited_image"][i].squeeze())
-        original_image.save(os.path.join(folder_path, f"{i}_original.png"))
-        edited_image.save(os.path.join(folder_path, f"{i}_edited.png"))
+        orig_path = os.path.join(folder_path, f"{i}_original.png")
+        edited_path = os.path.join(folder_path, f"{i}_edited.png")
+        original_image.save(orig_path)
+        edited_image.save(edited_path)
     
     upload_folder(repo_id=repo_id, folder_path=folder_path, repo_type="dataset")
