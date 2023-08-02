@@ -172,8 +172,8 @@ if __name__ == "__main__":
     )
     accelerator = Accelerator(project_config=accelerator_project_config)
 
+    model = load_model().eval()
     if accelerator.is_main_process:
-        model = load_model().eval()
         print("Model loaded.")
     model = accelerator.prepare(model)
 
