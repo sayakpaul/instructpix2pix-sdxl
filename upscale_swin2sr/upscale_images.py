@@ -125,7 +125,7 @@ def get_dataloader(accelerator):
         }
 
     dataset = (
-        wds.WebDataset(DATASET_PATH, handler=wds.warn_and_continue)
+        wds.WebDataset(DATASET_PATH, resampled=True, handler=wds.warn_and_continue)
         .decode("pil", handler=wds.warn_and_continue)
         .rename(
             original_prompt="original_prompt.txt",
