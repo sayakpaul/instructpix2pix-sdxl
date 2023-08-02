@@ -126,7 +126,7 @@ def get_dataloader(global_batch_size, num_workers, num_train_examples):
         }
 
     dataset = (
-        wds.WebDataset(DATASET_PATH, resampled=True, handler=wds.warn_and_continue)
+        wds.WebDataset(DATASET_PATH, handler=wds.warn_and_continue)
         .decode("pil", handler=wds.warn_and_continue)
         .rename(
             original_prompt="original_prompt.txt",
@@ -142,10 +142,9 @@ def get_dataloader(global_batch_size, num_workers, num_train_examples):
             handler=wds.warn_and_continue,
         )
         .map(preprocess_images, handler=wds.warn_and_continue)
-        .batched(BATCH_SIZE, partial=False, collation_fn=default_collate)
-        .with_epoch(num_worker_batches)
+        .batched(BATCH_SIZE, partial=True, collation_fn=default_collate)
     )
-    dataloader = wds.WebLoader(
+    dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=None,
         shuffle=False,
