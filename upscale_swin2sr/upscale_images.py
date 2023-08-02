@@ -79,7 +79,7 @@ def get_dataloader(global_batch_size, num_workers, num_train_examples):
     num_worker_batches = math.ceil(
         num_train_examples / (global_batch_size * num_workers)
     )  # per dataloader worker
-    resize = transforms.Compose(transforms.Resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO)))
+    resize = transforms.Resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
 
     def preprocess_images(sample):
         # We need to ensure that the original and the edited images undergo the same
@@ -173,8 +173,6 @@ if __name__ == "__main__":
     accelerator = Accelerator(project_config=accelerator_project_config)
 
     model = load_model().eval()
-    if accelerator.is_main_process:
-        print("Model loaded.")
     model = accelerator.prepare(model)
 
     dataloader = get_dataloader(
@@ -182,7 +180,9 @@ if __name__ == "__main__":
         num_workers=NUM_WORKERS,
         num_train_examples=NUM_TRAINING_EXAMPLES,
     )
-    print("Dataloader prepared.")
+    if accelerator.is_main_process:
+        print("Model loaded.")
+        print("Dataloader prepared.")
 
     all_upscaled_original_paths = []
     all_upscaled_edited_paths = []
