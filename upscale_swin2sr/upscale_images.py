@@ -80,7 +80,8 @@ def filter_keys(key_set):
     return _f
 
 
-def get_dataloader(num_workers):
+def get_dataloader(accelerator):
+    num_worker_batches = NUM_SAMPLES / (accelerator.num_processes * NUM_WORKERS)
     resize = transforms.Resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
 
     def preprocess_images(sample):
@@ -138,16 +139,17 @@ def get_dataloader(num_workers):
         )
         .map(preprocess_images, handler=wds.warn_and_continue)
         .batched(BATCH_SIZE, partial=True, collation_fn=default_collate)
+        .with_epoch(num_worker_batches)
     )
     loader = wds.WebLoader(
         dataset,
         batch_size=None,
         shuffle=False,
-        num_workers=num_workers,
-        # pin_memory=True,
-        # persistent_workers=True,
+        num_workers=NUM_WORKERS,
+        pin_memory=True,
+        persistent_workers=True,
     )
-    loader = loader.ddp_equalize(NUM_SAMPLES // BATCH_SIZE)
+    
     return loader
 
 
@@ -182,7 +184,7 @@ if __name__ == "__main__":
     model = load_model().eval()
     model = accelerator.prepare(model)
 
-    dataloader = get_dataloader(num_workers=NUM_WORKERS)
+    dataloader = get_dataloader(accelerator)
     if accelerator.is_main_process:
         print("Model loaded.")
         print("Dataloader prepared.")
