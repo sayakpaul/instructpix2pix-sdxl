@@ -93,7 +93,8 @@ def get_dataloader(num_workers):
     return dataloader
 
 if __name__ == "__main__":
-    folder_path = os.makedirs("sample_images", exist_ok=True)
+    folder_path = "sample_images"
+    os.makedirs(folder_path, exist_ok=True)
 
     dataloader = get_dataloader(4)
     for sample in dataloader:
