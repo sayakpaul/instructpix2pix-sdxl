@@ -122,7 +122,7 @@ if __name__ == "__main__":
     for sample in dataset: 
         print(type(sample))
         for k in sample:
-            print(sample[k])
+            print(k, sample[k], type(sample[k]))
         break
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, pin_memory=True)
     print("Dataloader prepared.")
