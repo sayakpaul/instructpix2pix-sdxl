@@ -202,7 +202,7 @@ if __name__ == "__main__":
     model = load_model().eval()
     model = accelerator.prepare(model)
 
-    dataloader = get_dataloader(accelerator)
+    dataloader = get_dataloader()
     if accelerator.is_main_process:
         print("Model loaded.")
         print("Dataloader prepared.")
