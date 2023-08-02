@@ -109,4 +109,4 @@ if __name__ == "__main__":
         edited_image.save(os.path.join(folder_path, f"{i}_edited.png"))
 
     api = HfApi()
-    api.upload_folder(repo_id=repo_id, folder_path=folder_path)
+    api.upload_folder(repo_id=repo_id, folder_path=folder_path, repo_type="dataset")
