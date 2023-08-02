@@ -28,7 +28,7 @@ PARAM_KEY_G = "params_ema"
 SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 
 NUM_SAMPLES = 313010
 NUM_WORKERS = 4
@@ -125,7 +125,7 @@ def get_dataloader(accelerator):
         }
 
     dataset = (
-        wds.WebDataset(DATASET_PATH, resampled=True, handler=wds.warn_and_continue)
+        wds.WebDataset(DATASET_PATH, handler=wds.warn_and_continue)
         .decode("pil", handler=wds.warn_and_continue)
         .rename(
             original_prompt="original_prompt.txt",
@@ -142,9 +142,8 @@ def get_dataloader(accelerator):
         )
         .map(preprocess_images, handler=wds.warn_and_continue)
         .batched(BATCH_SIZE, partial=True, collation_fn=default_collate)
-        .with_epoch(num_worker_batches)
     )
-    loader = wds.WebLoader(
+    loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=None,
         shuffle=False,
@@ -209,7 +208,8 @@ if __name__ == "__main__":
         )
 
         # Inference.
-        output_images = model(images)
+        with torch.autocast(accelerator.device.type, dtype=torch.float16):
+            output_images = model(images)
 
         # Post-process.
         original_images, edited_images = output_images.chunk(2)
