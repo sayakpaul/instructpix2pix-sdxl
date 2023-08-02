@@ -103,9 +103,9 @@ if __name__ == "__main__":
     for i in range(len(sample)):
         if i == 5:
             break
-        print(sample["original_image"][i].shape)
-        original_image = postprocess_image(sample["original_image"][i])
-        edited_image = postprocess_image(sample["edited_image"][i])
+        
+        original_image = postprocess_image(sample["original_image"][i].squeeze())
+        edited_image = postprocess_image(sample["edited_image"][i].squeeze())
         original_image.save(os.path.join(folder_path, f"{i}_original.png"))
         edited_image.save(os.path.join(folder_path, f"{i}_edited.png"))
     
