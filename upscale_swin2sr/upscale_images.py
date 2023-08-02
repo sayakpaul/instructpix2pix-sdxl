@@ -110,7 +110,7 @@ if __name__ == "__main__":
         examples["original_image"] = [
             preprocesss_image(image) for image in examples["original_image"]
         ]
-        examples["edited_images"] = [
+        examples["edited_image"] = [
             preprocesss_image(image) for image in examples["edited_image"]
         ]
         examples["original_prompt"] = [prompt for prompt in examples["original_prompt"]]
