@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 MODEL_PATH = "model_zoo/swin2sr/Swin2SR_RealworldSR_X4_64_BSRGAN_PSNR.pth"
 PARAM_KEY_G = "params_ema"
+SCALE = 4
 WINDOW_SIZE = 8
 DOWNSAMPLE_TO = 256
 BATCH_SIZE = 32
@@ -64,7 +65,7 @@ def preprocesss_image(image: PIL.Image.Image) -> torch.FloatTensor:
     image = image.resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
     image = np.array(image).astype("float32") / 255.0
     image = image[:, :, [2, 1, 0]], (2, 0, 1)  # HWC -> CHW
-    img_lq = torch.from_numpy(image)
+    img_lq = torch.from_numpy(image).float().unsqueeze(0)
 
     _, _, h_old, w_old = img_lq.size()
     h_pad = (h_old // WINDOW_SIZE + 1) * WINDOW_SIZE - h_old
