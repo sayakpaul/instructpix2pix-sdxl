@@ -106,6 +106,9 @@ if __name__ == "__main__":
     model = load_model().eval().to("cuda:1")
     print("Model loaded.")
 
+    folder_path = os.path.join(PROJECT_DIR, "sayak")
+    os.makedirs(folder_path, exist_ok=True)
+
     def pp(examples):
         examples["original_image"] = [
             preprocesss_image(image) for image in examples["original_image"]
@@ -156,12 +159,12 @@ if __name__ == "__main__":
             all_edited_prompts += [prompt for prompt in batch["edited_prompt"]]
 
             orig_img_paths = [
-                os.path.join(PROJECT_DIR, "sayak", f"{idx}_{i}_original_img.png")
+                os.path.join(folder_path, f"{idx}_{i}_original_img.png")
                 for i in len(original_images)
             ]
             all_upscaled_original_paths += [path for path in orig_img_paths]
             edited_img_paths = [
-                os.path.join(PROJECT_DIR, "sayak", f"{idx}_{i}_edited_img.png")
+                os.path.join(folder_path, f"{idx}_{i}_edited_img.png")
                 for i in len(edited_images)
             ]
             all_upscaled_edited_paths += [path for path in edited_img_paths]
