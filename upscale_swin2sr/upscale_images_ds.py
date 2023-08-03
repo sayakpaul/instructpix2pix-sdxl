@@ -64,7 +64,7 @@ def load_model() -> torch.nn.Module:
 def preprocesss_image(image: PIL.Image.Image) -> torch.FloatTensor:
     image = image.resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
     image = np.array(image).astype("float32") / 255.0
-    image = image[:, :, [2, 1, 0]], (2, 0, 1)  # HWC -> CHW
+    image = np.transpose(image, (2, 0, 1)) # HWC -> CHW
     img_lq = torch.from_numpy(image).float().unsqueeze(0)
 
     _, _, h_old, w_old = img_lq.size()
