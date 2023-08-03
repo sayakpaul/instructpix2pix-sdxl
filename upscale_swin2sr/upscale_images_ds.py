@@ -136,8 +136,6 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         for idx, batch in enumerate(tqdm(dataloader)):
-            if idx == 1:
-                break
             # Collate the original and edited images so that we do only a single
             # forward pass.
             images = [image for image in batch["original_image"]]
