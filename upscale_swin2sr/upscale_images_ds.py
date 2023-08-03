@@ -161,12 +161,12 @@ if __name__ == "__main__":
 
             orig_img_paths = [
                 os.path.join(folder_path, f"{idx}_{i}_original_img.png")
-                for i in len(original_images)
+                for i in range(len(original_images))
             ]
             all_upscaled_original_paths += [path for path in orig_img_paths]
             edited_img_paths = [
                 os.path.join(folder_path, f"{idx}_{i}_edited_img.png")
-                for i in len(edited_images)
+                for i in range(len(edited_images))
             ]
             all_upscaled_edited_paths += [path for path in edited_img_paths]
 
