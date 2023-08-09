@@ -50,4 +50,4 @@ if __name__ == "__main__":
         break
 
     repo_id = create_repo(repo_id="upscaled-validation-logging", exist_ok=True).repo_id
-    upload_folder(repo_id, folder_path=OUTPUT_DIR)
+    upload_folder(repo_id=repo_id, folder_path=OUTPUT_DIR)
