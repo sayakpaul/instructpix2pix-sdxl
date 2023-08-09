@@ -961,6 +961,10 @@ def main():
                 def compute_time_ids(original_size, crops_coords_top_left):
                     # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
                     target_size = (args.resolution, args.resolution)
+                    if not isinstance(original_size, tuple):
+                        original_size = tuple(original_size)
+                    if not isinstance(crops_coords_top_left, tuple):
+                        crops_coords_top_left = tuple(crops_coords_top_left)
                     add_time_ids = list(
                         original_size + crops_coords_top_left + target_size
                     )
