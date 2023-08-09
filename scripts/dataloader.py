@@ -132,7 +132,7 @@ def get_dataloader(args):
             handler=wds.warn_and_continue,
         )
         .map(preprocess_images, handler=wds.warn_and_continue)
-        .batched(args.per_gpu_batch_size, partial=False, collation_fn=default_collate)
+        .batched(args.per_gpu_batch_size, partial=False, collation_fn=collate_fn)
         .with_epoch(num_worker_batches)
     )
 
