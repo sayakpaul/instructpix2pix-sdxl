@@ -24,6 +24,7 @@ from torchvision import transforms
 from torchvision.transforms.functional import crop
 import random
 
+
 def filter_keys(key_set):
     def _f(dictionary):
         return {k: v for k, v in dictionary.items() if k in key_set}
@@ -41,15 +42,21 @@ def get_dataloader(args):
     num_samples = num_batches * args.global_batch_size
 
     # Preprocessing the datasets.
-    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
-    train_crop = transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution)
+    train_resize = transforms.Resize(
+        args.resolution, interpolation=transforms.InterpolationMode.BILINEAR
+    )
+    train_crop = (
+        transforms.CenterCrop(args.resolution)
+        if args.center_crop
+        else transforms.RandomCrop(args.resolution)
+    )
     train_flip = transforms.RandomHorizontalFlip(p=1.0)
     normalize = transforms.Normalize([0.5], [0.5])
 
     def preprocess_images(sample):
         # We need to ensure that the original and the edited images undergo the same
         # augmentation transforms.
-        # Some utilities have been taken from 
+        # Some utilities have been taken from
         # https://github.com/huggingface/diffusers/blob/main/examples/text_to_image/train_text_to_image_lora_sdxl.py
         orig_image = sample["original_image"]
         images = torch.stack(
@@ -64,15 +71,17 @@ def get_dataloader(args):
             x1 = max(0, int(round((orig_image.width - args.resolution) / 2.0)))
             images = train_crop(images)
         else:
-            y1, x1, h, w = train_crop.get_params(images, (args.resolution, args.resolution))
+            y1, x1, h, w = train_crop.get_params(
+                images, (args.resolution, args.resolution)
+            )
             images = crop(images, y1, x1, h, w)
-        
+
         if args.random_flip and random.random() < 0.5:
             # flip
             x1 = orig_image.width - x1
             images = train_flip(images)
         crop_top_left = (y1, x1)
-        
+
         transformed_images = normalize(images)
 
         # Separate the original and edited images and the edit prompt.
@@ -85,8 +94,21 @@ def get_dataloader(args):
             "edited_image": edited_image,
             "edit_prompt": sample["edit_prompt"],
             "original_size": (orig_image.height, orig_image.width),
-            "crop_top_left": crop_top_left
+            "crop_top_left": crop_top_left,
         }
+
+    def collate_fn(samples):
+        samples = {
+            k: v
+            for k, v in samples.items()
+            if k != "original_size" or k != "crop_top_left"
+        }
+        original_sizes = [sample["original_size"] for sample in samples]
+        crop_top_lefts = [sample["crop_top_left"] for sample in samples]
+        samples.update(
+            {"original_sizes": original_sizes, "crop_top_lefts": crop_top_lefts}
+        )
+        return samples
 
     dataset = (
         wds.WebDataset(args.dataset_path, resampled=True, handler=wds.warn_and_continue)
@@ -151,6 +173,6 @@ if __name__ == "__main__":
         print(sample["edited_image"].shape)
         print(len(sample["edit_prompt"]))
         for s, c in zip(sample["original_size"], sample["crop_top_left"]):
-            print(f'Original size: {s}')
-            print(f'Crop: {c}')
+            print(f"Original size: {s}")
+            print(f"Crop: {c}")
         break

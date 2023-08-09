@@ -961,19 +961,31 @@ def main():
                 def compute_time_ids(original_size, crops_coords_top_left):
                     # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
                     target_size = (args.resolution, args.resolution)
-                    add_time_ids = list(original_size + crops_coords_top_left + target_size)
+                    add_time_ids = list(
+                        original_size + crops_coords_top_left + target_size
+                    )
                     add_time_ids = torch.tensor([add_time_ids])
-                    add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
+                    add_time_ids = add_time_ids.to(
+                        accelerator.device, dtype=weight_dtype
+                    )
                     return add_time_ids
 
                 # Pack SDXL conditions.
                 add_time_ids = torch.cat(
-                    [compute_time_ids(s, c) for s, c in zip(batch["original_size"], batch["crop_top_left"])]
+                    [
+                        compute_time_ids(s, c)
+                        for s, c in zip(
+                            batch["original_sizes"], batch["crop_top_lefts"]
+                        )
+                    ]
                 )
                 prompt_embeds, pooled_prompt_embeds = compute_embeddings_for_prompts(
                     batch["edit_prompt"], text_encoders, tokenizers
                 )
-                added_cond_kwargs = {"text_embeds": pooled_prompt_embeds, "time_ids": add_time_ids}
+                added_cond_kwargs = {
+                    "text_embeds": pooled_prompt_embeds,
+                    "time_ids": add_time_ids,
+                }
 
                 # Get the additional image embedding for conditioning.
                 # Instead of getting a diagonal Gaussian here, we simply take the mode.
