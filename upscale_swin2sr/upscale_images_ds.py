@@ -190,4 +190,4 @@ if __name__ == "__main__":
             edited_image=ImageFeature(),
         ),
     )
-    ds.save_to_disk(os.path.join(PROJECT_DIR, NEW_DATASET_NAME))
+    ds.save_to_disk(os.path.join(folder_path, NEW_DATASET_NAME))
