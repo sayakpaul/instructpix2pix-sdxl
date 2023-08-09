@@ -180,22 +180,22 @@ def parse_args():
             "The resolution for input images, all the images in the train/validation dataset will be resized to this resolution."
         ),
     )
-    parser.add_argument(
-        "--crops_coords_top_left_h",
-        type=int,
-        default=0,
-        help=(
-            "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
-        ),
-    )
-    parser.add_argument(
-        "--crops_coords_top_left_w",
-        type=int,
-        default=0,
-        help=(
-            "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
-        ),
-    )
+    # parser.add_argument(
+    #     "--crops_coords_top_left_h",
+    #     type=int,
+    #     default=0,
+    #     help=(
+    #         "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
+    #     ),
+    # )
+    # parser.add_argument(
+    #     "--crops_coords_top_left_w",
+    #     type=int,
+    #     default=0,
+    #     help=(
+    #         "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
+    #     ),
+    # )
     parser.add_argument(
         "--center_crop",
         default=False,
@@ -958,8 +958,6 @@ def main():
                 # So, first, convert images to latent space.
                 if args.pretrained_vae_model_name_or_path is not None:
                     edited_pixel_values = batch["edited_image"].to(dtype=weight_dtype)
-                    if vae.dtype != weight_dtype:
-                        vae.to(dtype=weight_dtype)
                 else:
                     edited_pixel_values = batch["edited_image"]
                 edited_pixel_values = edited_pixel_values.to(
@@ -986,14 +984,23 @@ def main():
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
+                # time ids
+                def compute_time_ids(original_size, crops_coords_top_left):
+                    # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
+                    target_size = (args.resolution, args.resolution)
+                    add_time_ids = list(original_size + crops_coords_top_left + target_size)
+                    add_time_ids = torch.tensor([add_time_ids])
+                    add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
+                    return add_time_ids
+
                 # Pack SDXL conditions.
+                add_time_ids = torch.cat(
+                    [compute_time_ids(s, c) for s, c in zip(batch["original_size"], batch["crop_top_left"])]
+                )
                 prompt_embeds, pooled_prompt_embeds = compute_embeddings_for_prompts(
                     batch["edit_prompt"], text_encoders, tokenizers
                 )
-                added_cond_kwargs = {
-                    "text_embeds": pooled_prompt_embeds,
-                    "time_ids": compute_time_ids(batch_size=len(batch["edit_prompt"])),
-                }
+                added_cond_kwargs = {"text_embeds": pooled_prompt_embeds, "time_ids": add_time_ids}
 
                 # Get the additional image embedding for conditioning.
                 # Instead of getting a diagonal Gaussian here, we simply take the mode.
