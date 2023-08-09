@@ -151,5 +151,6 @@ if __name__ == "__main__":
         print(sample["edited_image"].shape)
         print(len(sample["edit_prompt"]))
         for i in range(len(sample["original_size"])):
-            print(sample["original_size"][i], sample["crop_top_left"][i])
+            print(f'Original size: {sample["original_size"][i]}')
+            print(f'Crops: {sample["crop_top_left"][i]}')
         break
