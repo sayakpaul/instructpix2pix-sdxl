@@ -428,12 +428,23 @@ def parse_args():
 
     return args
 
-def log_validation(vae, unet, text_encoder_1, text_encoder_2, tokenizer_1, tokenizer_2, args, accelerator, weight_dtype, global_step):
+
+def log_validation(
+    vae,
+    unet,
+    text_encoder_1,
+    text_encoder_2,
+    tokenizer_1,
+    tokenizer_2,
+    args,
+    accelerator,
+    weight_dtype,
+    global_step,
+):
     logger.info(
         f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
         f" {args.validation_prompt}."
     )
-
 
     # The models need unwrapping because for compatibility in distributed training mode.
     pipeline = StableDiffusionXLInstructPix2PixPipeline.from_pretrained(
@@ -502,9 +513,9 @@ def log_validation(vae, unet, text_encoder_1, text_encoder_2, tokenizer_1, token
                 )
             tracker.log({"validation": wandb_table})
 
-
     del pipeline
     torch.cuda.empty_cache()
+
 
 def main():
     args = parse_args()
@@ -929,11 +940,7 @@ def main():
             accelerator.load_state(os.path.join(args.output_dir, path))
             global_step = int(path.split("-")[1])
 
-            resume_global_step = global_step * args.gradient_accumulation_steps
             first_epoch = global_step // num_update_steps_per_epoch
-            resume_step = resume_global_step % (
-                num_update_steps_per_epoch * args.gradient_accumulation_steps
-            )
 
     # Only show the progress bar once on each machine.
     progress_bar = tqdm(
@@ -955,7 +962,9 @@ def main():
                         vae.to(dtype=weight_dtype)
                 else:
                     edited_pixel_values = batch["edited_image"]
-                edited_pixel_values = edited_pixel_values.to(accelerator.device, non_blocking=True)
+                edited_pixel_values = edited_pixel_values.to(
+                    accelerator.device, non_blocking=True
+                )
                 latents = vae.encode(edited_pixel_values).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
                 if args.pretrained_vae_model_name_or_path is None:
@@ -994,7 +1003,9 @@ def main():
                     )
                 else:
                     original_pixel_values = batch["original_image"]
-                original_pixel_values = original_pixel_values.to(accelerator.device, non_blocking=True)
+                original_pixel_values = original_pixel_values.to(
+                    accelerator.device, non_blocking=True
+                )
                 original_image_embeds = vae.encode(
                     original_pixel_values
                 ).latent_dist.sample()
@@ -1105,7 +1116,7 @@ def main():
                         )
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
-            
+
                     if global_step % args.validation_steps == 0:
                         if (args.val_image_url_or_path is not None) and (
                             args.validation_prompt is not None
@@ -1115,7 +1126,7 @@ def main():
                                 # Store the UNet parameters temporarily and load the EMA parameters to perform inference.
                                 ema_unet.store(unet.parameters())
                                 ema_unet.copy_to(unet.parameters())
-                            
+
                             log_validation(
                                 vae=vae,
                                 unet=unet,
@@ -1178,7 +1189,10 @@ def main():
                 if urlparse(image_url_or_path).scheme
                 else Image.open(image_url_or_path).convert("RGB")
             )(args.val_image_url_or_path)
-            with torch.autocast(accelerator.device.type, enabled=accelerator.mixed_precision == "fp16",):
+            with torch.autocast(
+                accelerator.device.type,
+                enabled=accelerator.mixed_precision == "fp16",
+            ):
                 for _ in range(args.num_validation_images):
                     edited_images.append(
                         pipeline(
