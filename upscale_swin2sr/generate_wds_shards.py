@@ -6,11 +6,16 @@ from datasets import Dataset
 
 ray.init()
 
+
 def main():
     dataset_path = "/scratch/suraj/instructpix2pix-clip-filtered-upscaled"
     wds_shards_path = "/scratch/suraj/instructpix2pix-clip-filtered-upscaled-wds"
     # get all .arrow files in the dataset path
-    dataset_files = [os.path.join(dataset_path, f) for f in os.listdir(dataset_path) if f.endswith(".arrow")]
+    dataset_files = [
+        os.path.join(dataset_path, f)
+        for f in os.listdir(dataset_path)
+        if f.endswith(".arrow")
+    ]
 
     @ray.remote
     def create_shard(path):
@@ -32,9 +37,10 @@ def main():
             }
             shard.write(wds_example)
         shard.close()
-    
+
     futures = [create_shard.remote(path) for path in dataset_files]
     ray.get(futures)
+
 
 if __name__ == "__main__":
     main()

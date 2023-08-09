@@ -64,7 +64,7 @@ def load_model() -> torch.nn.Module:
 def preprocesss_image(image: PIL.Image.Image) -> torch.FloatTensor:
     image = image.resize((DOWNSAMPLE_TO, DOWNSAMPLE_TO))
     image = np.array(image).astype("float32") / 255.0
-    image = np.transpose(image, (2, 0, 1)) # HWC -> CHW
+    image = np.transpose(image, (2, 0, 1))  # HWC -> CHW
     img_lq = torch.from_numpy(image).float().unsqueeze(0)
 
     _, _, h_old, w_old = img_lq.size()
@@ -190,4 +190,6 @@ if __name__ == "__main__":
             edited_image=ImageFeature(),
         ),
     )
-    ds.save_to_disk(os.path.join(folder_path, NEW_DATASET_NAME))
+    ds.save_to_disk(
+        os.path.join(folder_path, NEW_DATASET_NAME), max_shard_size="1500MB"
+    )
