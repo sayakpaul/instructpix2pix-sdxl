@@ -183,7 +183,4 @@ if __name__ == "__main__":
         print(sample["original_images"].shape)
         print(sample["edited_images"].shape)
         print(len(sample["edit_prompts"]))
-        for s, c in zip(sample["original_sizes"], sample["crop_top_lefts"]):
-            print(f"Original size: {s}")
-            print(f"Crop: {c}")
         break
