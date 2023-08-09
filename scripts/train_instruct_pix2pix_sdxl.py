@@ -984,7 +984,7 @@ def main():
                     ]
                 )
                 prompt_embeds, pooled_prompt_embeds = compute_embeddings_for_prompts(
-                    batch["edit_prompt"], text_encoders, tokenizers
+                    batch["edit_prompts"], text_encoders, tokenizers
                 )
                 added_cond_kwargs = {
                     "text_embeds": pooled_prompt_embeds,
