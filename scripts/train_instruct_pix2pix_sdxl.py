@@ -180,22 +180,6 @@ def parse_args():
             "The resolution for input images, all the images in the train/validation dataset will be resized to this resolution."
         ),
     )
-    # parser.add_argument(
-    #     "--crops_coords_top_left_h",
-    #     type=int,
-    #     default=0,
-    #     help=(
-    #         "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
-    #     ),
-    # )
-    # parser.add_argument(
-    #     "--crops_coords_top_left_w",
-    #     type=int,
-    #     default=0,
-    #     help=(
-    #         "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
-    #     ),
-    # )
     parser.add_argument(
         "--center_crop",
         default=False,
@@ -843,17 +827,6 @@ def main():
         return torch.concat(null_conditioning_list, dim=-1)
 
     null_conditioning = compute_null_conditioning()
-
-    # The additional inputs needed by the SDXL UNet.
-    def compute_time_ids(batch_size):
-        crops_coords_top_left = (
-            args.crops_coords_top_left_h,
-            args.crops_coords_top_left_w,
-        )
-        original_size = target_size = (args.resolution, args.resolution)
-        add_time_ids = list(original_size + crops_coords_top_left + target_size)
-        add_time_ids = torch.tensor([add_time_ids], dtype=weight_dtype)
-        return add_time_ids.to(accelerator.device).repeat(batch_size, 1)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
