@@ -930,9 +930,9 @@ def main():
                 # are conditioned on the original image (which was edited) and the edit instruction.
                 # So, first, convert images to latent space.
                 if args.pretrained_vae_model_name_or_path is not None:
-                    edited_pixel_values = batch["edited_image"].to(dtype=weight_dtype)
+                    edited_pixel_values = batch["edited_images"].to(dtype=weight_dtype)
                 else:
-                    edited_pixel_values = batch["edited_image"]
+                    edited_pixel_values = batch["edited_images"]
                 edited_pixel_values = edited_pixel_values.to(
                     accelerator.device, non_blocking=True
                 )
@@ -990,11 +990,11 @@ def main():
                 # Get the additional image embedding for conditioning.
                 # Instead of getting a diagonal Gaussian here, we simply take the mode.
                 if args.pretrained_vae_model_name_or_path is not None:
-                    original_pixel_values = batch["original_image"].to(
+                    original_pixel_values = batch["original_images"].to(
                         dtype=weight_dtype
                     )
                 else:
-                    original_pixel_values = batch["original_image"]
+                    original_pixel_values = batch["original_images"]
                 original_pixel_values = original_pixel_values.to(
                     accelerator.device, non_blocking=True
                 )

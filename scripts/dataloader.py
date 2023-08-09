@@ -19,7 +19,6 @@ from argparse import Namespace
 
 import torch
 import webdataset as wds
-from torch.utils.data import default_collate
 from torchvision import transforms
 from torchvision.transforms.functional import crop
 import random
@@ -98,17 +97,26 @@ def get_dataloader(args):
         }
 
     def collate_fn(samples):
-        samples = {
-            k: v
-            for k, v in samples.items()
-            if k != "original_size" or k != "crop_top_left"
-        }
+        original_images = torch.stack([sample["original_image"] for sample in samples])
+        original_images = original_images.to(
+            memory_format=torch.contiguous_format
+        ).float()
+
+        edited_images = torch.stack([sample["edited_image"] for sample in samples])
+        edited_images = edited_images.to(memory_format=torch.contiguous_format).float()
+
+        edit_prompts = [sample["edit_prompt"] for sample in samples]
+
         original_sizes = [sample["original_size"] for sample in samples]
         crop_top_lefts = [sample["crop_top_left"] for sample in samples]
-        samples.update(
-            {"original_sizes": original_sizes, "crop_top_lefts": crop_top_lefts}
-        )
-        return samples
+
+        return {
+            "original_images": original_images,
+            "edited_images": edited_images,
+            "original_sizes": original_sizes,
+            "crop_top_lefts": crop_top_lefts,
+            "edit_prompts": edit_prompts,
+        }
 
     dataset = (
         wds.WebDataset(args.dataset_path, resampled=True, handler=wds.warn_and_continue)
@@ -169,10 +177,10 @@ if __name__ == "__main__":
     dataloader = get_dataloader(args)
     for sample in dataloader:
         print(sample.keys())
-        print(sample["original_image"].shape)
-        print(sample["edited_image"].shape)
-        print(len(sample["edit_prompt"]))
-        for s, c in zip(sample["original_size"], sample["crop_top_left"]):
+        print(sample["original_images"].shape)
+        print(sample["edited_images"].shape)
+        print(len(sample["edit_prompts"]))
+        for s, c in zip(sample["original_sizes"], sample["crop_top_lefts"]):
             print(f"Original size: {s}")
             print(f"Crop: {c}")
         break
