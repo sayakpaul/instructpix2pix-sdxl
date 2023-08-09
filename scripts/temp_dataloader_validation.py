@@ -23,7 +23,7 @@ if __name__ == "__main__":
     dataloader = get_dataloader(args)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    idx = 10
+    idx = 8
     for sample in dataloader:
         print(sample.keys())
         print(sample["original_image"].shape)
