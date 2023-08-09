@@ -110,6 +110,9 @@ def get_dataloader(args):
         original_sizes = [sample["original_size"] for sample in samples]
         crop_top_lefts = [sample["crop_top_left"] for sample in samples]
 
+        for i, s in enumerate(original_sizes):
+            print(s, crop_top_lefts[i])
+
         return {
             "original_images": original_images,
             "edited_images": edited_images,
