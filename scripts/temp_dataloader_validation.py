@@ -23,28 +23,27 @@ if __name__ == "__main__":
     dataloader = get_dataloader(args)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    idx = 8
     for sample in dataloader:
         print(sample.keys())
         print(sample["original_image"].shape)
         print(sample["edited_image"].shape)
         print(len(sample["edit_prompt"]))
         
-        for i in range(idx):
-            current_orig_sample = sample["original_image"][idx].numpy()
+        for i in range(len(sample["original_image"])):
+            current_orig_sample = sample["original_image"][i].numpy()
             current_orig_sample *= 255.
             current_orig_sample = current_orig_sample.round().astype("uint8")
             current_orig_sample = Image.fromarray(current_orig_sample)
 
-            current_edited_sample = sample["edited_image"][idx].numpy()
+            current_edited_sample = sample["edited_image"][i].numpy()
             current_edited_sample *= 255.
             current_edited_sample = current_edited_sample.round().astype("uint8")
             current_edited_sample = Image.fromarray(current_edited_sample)
 
-            current_orig_sample.save(os.path.join(OUTPUT_DIR, f"{idx}_orig.png"))
-            current_edited_sample.save(os.path.join(OUTPUT_DIR, f"{idx}_edited.png"))
-            with open(os.path.join(OUTPUT_DIR, f"{idx}_edited_prompt.txt"), "w") as f:
-                f.write(sample["edit_prompt"][idx])
+            current_orig_sample.save(os.path.join(OUTPUT_DIR, f"{i}_orig.png"))
+            current_edited_sample.save(os.path.join(OUTPUT_DIR, f"{i}_edited.png"))
+            with open(os.path.join(OUTPUT_DIR, f"{i}_edited_prompt.txt"), "w") as f:
+                f.write(sample["edit_prompt"][i])
 
         break
 
