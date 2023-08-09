@@ -181,22 +181,6 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--crops_coords_top_left_h",
-        type=int,
-        default=0,
-        help=(
-            "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
-        ),
-    )
-    parser.add_argument(
-        "--crops_coords_top_left_w",
-        type=int,
-        default=0,
-        help=(
-            "Coordinate for (the height) to be included in the crop coordinate embeddings needed by SDXL UNet."
-        ),
-    )
-    parser.add_argument(
         "--center_crop",
         default=False,
         action="store_true",
@@ -844,17 +828,6 @@ def main():
 
     null_conditioning = compute_null_conditioning()
 
-    # The additional inputs needed by the SDXL UNet.
-    def compute_time_ids(batch_size):
-        crops_coords_top_left = (
-            args.crops_coords_top_left_h,
-            args.crops_coords_top_left_w,
-        )
-        original_size = target_size = (args.resolution, args.resolution)
-        add_time_ids = list(original_size + crops_coords_top_left + target_size)
-        add_time_ids = torch.tensor([add_time_ids], dtype=weight_dtype)
-        return add_time_ids.to(accelerator.device).repeat(batch_size, 1)
-
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
     num_update_steps_per_epoch = math.ceil(
@@ -957,11 +930,11 @@ def main():
                 # are conditioned on the original image (which was edited) and the edit instruction.
                 # So, first, convert images to latent space.
                 if args.pretrained_vae_model_name_or_path is not None:
-                    edited_pixel_values = batch["edited_image"].to(dtype=weight_dtype)
+                    edited_pixel_values = batch["edited_images"].to(dtype=weight_dtype)
                     if vae.dtype != weight_dtype:
                         vae.to(dtype=weight_dtype)
                 else:
-                    edited_pixel_values = batch["edited_image"]
+                    edited_pixel_values = batch["edited_images"]
                 edited_pixel_values = edited_pixel_values.to(
                     accelerator.device, non_blocking=True
                 )
@@ -986,23 +959,48 @@ def main():
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
+                # time ids
+                def compute_time_ids(original_size, crops_coords_top_left):
+                    # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
+                    target_size = (args.resolution, args.resolution)
+                    if not isinstance(original_size, tuple):
+                        original_size = tuple(original_size)
+                    if not isinstance(crops_coords_top_left, tuple):
+                        crops_coords_top_left = tuple(crops_coords_top_left)
+                    add_time_ids = list(
+                        original_size + crops_coords_top_left + target_size
+                    )
+                    add_time_ids = torch.tensor([add_time_ids])
+                    add_time_ids = add_time_ids.to(
+                        accelerator.device, dtype=weight_dtype
+                    )
+                    return add_time_ids
+
                 # Pack SDXL conditions.
+                add_time_ids = torch.cat(
+                    [
+                        compute_time_ids(s, c)
+                        for s, c in zip(
+                            batch["original_sizes"], batch["crop_top_lefts"]
+                        )
+                    ]
+                )
                 prompt_embeds, pooled_prompt_embeds = compute_embeddings_for_prompts(
-                    batch["edit_prompt"], text_encoders, tokenizers
+                    batch["edit_prompts"], text_encoders, tokenizers
                 )
                 added_cond_kwargs = {
                     "text_embeds": pooled_prompt_embeds,
-                    "time_ids": compute_time_ids(batch_size=len(batch["edit_prompt"])),
+                    "time_ids": add_time_ids,
                 }
 
                 # Get the additional image embedding for conditioning.
                 # Instead of getting a diagonal Gaussian here, we simply take the mode.
                 if args.pretrained_vae_model_name_or_path is not None:
-                    original_pixel_values = batch["original_image"].to(
+                    original_pixel_values = batch["original_images"].to(
                         dtype=weight_dtype
                     )
                 else:
-                    original_pixel_values = batch["original_image"]
+                    original_pixel_values = batch["original_images"]
                 original_pixel_values = original_pixel_values.to(
                     accelerator.device, non_blocking=True
                 )

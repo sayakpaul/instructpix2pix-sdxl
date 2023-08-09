@@ -190,6 +190,4 @@ if __name__ == "__main__":
             edited_image=ImageFeature(),
         ),
     )
-    ds.save_to_disk(
-        os.path.join(folder_path, NEW_DATASET_NAME), max_shard_size="1GB"
-    )
+    ds.save_to_disk(os.path.join(folder_path, NEW_DATASET_NAME), max_shard_size="1GB")
