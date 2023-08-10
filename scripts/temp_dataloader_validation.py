@@ -25,19 +25,21 @@ if __name__ == "__main__":
 
     for sample in dataloader:
         print(sample.keys())
-        print(sample["original_image"].shape)
-        print(sample["edited_image"].shape)
-        print(len(sample["edit_prompt"]))
+        print(sample["original_images"].shape)
+        print(sample["edited_images"].shape)
+        print(len(sample["edit_prompts"]))
 
-        for i in range(len(sample["original_image"])):
-            current_orig_sample = sample["original_image"][i].numpy().squeeze()
+        for i in range(len(sample["original_images"])):
+            current_orig_sample = sample["original_images"][i].numpy().squeeze()
             current_orig_sample = current_orig_sample.transpose((1, 2, 0))
+            current_orig_sample = (current_orig_sample / 2 + 0.5).clip(0, 1)
             current_orig_sample *= 255.0
             current_orig_sample = current_orig_sample.round().astype("uint8")
             current_orig_sample = Image.fromarray(current_orig_sample)
 
-            current_edited_sample = sample["edited_image"][i].numpy().squeeze()
+            current_edited_sample = sample["edited_images"][i].numpy().squeeze()
             current_edited_sample = current_edited_sample.transpose((1, 2, 0))
+            current_edited_sample = (current_edited_sample / 2 + 0.5).clip(0, 1)
             current_edited_sample *= 255.0
             current_edited_sample = current_edited_sample.round().astype("uint8")
             current_edited_sample = Image.fromarray(current_edited_sample)
@@ -45,7 +47,7 @@ if __name__ == "__main__":
             current_orig_sample.save(os.path.join(OUTPUT_DIR, f"{i}_orig.png"))
             current_edited_sample.save(os.path.join(OUTPUT_DIR, f"{i}_edited.png"))
             with open(os.path.join(OUTPUT_DIR, f"{i}_edited_prompt.txt"), "w") as f:
-                f.write(sample["edit_prompt"][i])
+                f.write(sample["edit_prompts"][i])
 
         break
 

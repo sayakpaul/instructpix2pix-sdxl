@@ -1176,7 +1176,7 @@ def main():
                 repo_id=repo_id,
                 folder_path=args.output_dir,
                 commit_message="End of training",
-                ignore_patterns=["step_*", "epoch_*", "checkpoint_*"],
+                ignore_patterns=["step_*", "epoch_*", "checkpoint-*"],
             )
 
         if args.validation_prompt is not None:
