@@ -59,7 +59,8 @@ PROGRAM="scripts/train_instruct_pix2pix_sdxl.py \
     --dataset_path='pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -' \
     --use_ema \
     --enable_xformers_memory_efficient_attention \
-    --resolution=256 --random_flip \
+    --resolution=1024 --random_flip \
+    --conditioning_dropout_prob=0.05 \
     --per_gpu_batch_size=16 --gradient_accumulation_steps=1 \
     --num_workers=4 \
     --max_train_steps=20000 \
