@@ -57,7 +57,6 @@ PROGRAM="scripts/train_instruct_pix2pix_sdxl.py \
     --pretrained_model_name_or_path=$MODEL_ID \
     --pretrained_vae_model_name_or_path=madebyollin/sdxl-vae-fp16-fix \
     --dataset_path='pipe:aws s3 cp s3://muse-datasets/instructpix2pix-clip-filtered-wds/{000000..000062}.tar -' \
-    --use_ema \
     --enable_xformers_memory_efficient_attention \
     --resolution=1024 --random_flip \
     --conditioning_dropout_prob=0.05 \
