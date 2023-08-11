@@ -40,7 +40,7 @@ from tqdm.auto import tqdm
 from transformers import AutoTokenizer, PretrainedConfig
 
 import diffusers
-from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
+from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel, EulerDiscreteScheduler
 from diffusers.optimization import get_scheduler
 from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_instruct_pix2pix import (
     StableDiffusionXLInstructPix2PixPipeline,
@@ -738,9 +738,10 @@ def main():
     )
 
     # Load scheduler and models
-    noise_scheduler = DDPMScheduler.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="scheduler"
-    )
+    # noise_scheduler = DDPMScheduler.from_pretrained(
+    #     args.pretrained_model_name_or_path, subfolder="scheduler"
+    # )
+    noise_scheduler = EulerDiscreteScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
     text_encoder_1 = text_encoder_cls_1.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="text_encoder",
@@ -763,6 +764,18 @@ def main():
     vae.requires_grad_(False)
     text_encoder_1.requires_grad_(False)
     text_encoder_2.requires_grad_(False)
+
+    def get_sigmas(timesteps, n_dim=4, dtype=torch.float32):
+        sigmas = noise_scheduler.sigmas.to(device=accelerator.device, dtype=dtype)
+        schedule_timesteps = noise_scheduler.timesteps.to(accelerator.device)
+        timesteps = timesteps.to(accelerator.device)
+
+        step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]
+
+        sigma = sigmas[step_indices].flatten()
+        while len(sigma.shape) < n_dim:
+            sigma = sigma.unsqueeze(-1)
+        return sigma
 
     # Adapted from diffusers.pipelines.StableDiffusionXLPipeline.encode_prompt
     def encode_prompt(prompts, text_encoders, tokenizers):
@@ -826,7 +839,8 @@ def main():
             )
         return torch.concat(null_conditioning_list, dim=-1)
 
-    null_conditioning = compute_null_conditioning()
+    # null_conditioning = compute_null_conditioning()
+    null_conditioning = torch.zeros(1, 77, 2048, dtype=weight_dtype, device=accelerator.device)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
@@ -958,6 +972,8 @@ def main():
                 # Add noise to the latents according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                sigmas = get_sigmas(timesteps, len(noisy_latents.shape), noisy_latents.dtype)
+                inp_noisy_latents = noisy_latents / ((sigmas**2 + 1) ** 0.5)
 
                 # time ids
                 def compute_time_ids(original_size, crops_coords_top_left):
@@ -1040,12 +1056,13 @@ def main():
 
                 # Concatenate the `original_image_embeds` with the `noisy_latents`.
                 concatenated_noisy_latents = torch.cat(
-                    [noisy_latents, original_image_embeds], dim=1
+                    [inp_noisy_latents, original_image_embeds], dim=1
                 )
 
                 # Get the target for loss depending on the prediction type
                 if noise_scheduler.config.prediction_type == "epsilon":
-                    target = noise
+                    # target = noise
+                    target = latents
                 elif noise_scheduler.config.prediction_type == "v_prediction":
                     target = noise_scheduler.get_velocity(latents, noise, timesteps)
                 else:
@@ -1060,7 +1077,14 @@ def main():
                     encoder_hidden_states=prompt_embeds,
                     added_cond_kwargs=added_cond_kwargs,
                 ).sample
-                loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                model_pred = model_pred * (-sigmas) + noisy_latents
+                weighing = sigmas**-2.0
+
+                # loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                loss = torch.mean(
+                    (weighing.float() * (model_pred.float() - target.float()) ** 2).reshape(target.shape[0], -1), 1
+                )
+                loss = loss.mean()
 
                 # Backpropagate
                 accelerator.backward(loss)
