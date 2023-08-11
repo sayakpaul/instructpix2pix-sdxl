@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=instructpix2pix-sdxl
-#SBATCH --nodes=2
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1          # crucial - only 1 task per dist per node!
 #SBATCH --cpus-per-task=96
 #SBATCH --gres=gpu:8
@@ -63,7 +63,7 @@ PROGRAM="scripts/train_instruct_pix2pix_sdxl.py \
     --per_gpu_batch_size=2 --gradient_accumulation_steps=2 \
     --num_workers=4 \
     --max_train_steps=20000 \
-    --checkpointing_steps=2500 \
+    --checkpointing_steps=1000 --validation_steps=1000 --checkpoints_total_limit=3 \
     --learning_rate=1e-5 --lr_warmup_steps=0 \
     --mixed_precision=fp16 \
     --val_image_url='https://hf.co/datasets/diffusers/diffusers-images-docs/resolve/main/mountain.png' \
