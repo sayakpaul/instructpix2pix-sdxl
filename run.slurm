@@ -62,7 +62,7 @@ PROGRAM="scripts/train_instruct_pix2pix_sdxl.py \
     --conditioning_dropout_prob=0.05 \
     --per_gpu_batch_size=2 --gradient_accumulation_steps=2 \
     --num_workers=4 \
-    --max_train_steps=20000 \
+    --max_train_steps=40000 \
     --checkpointing_steps=1000 --validation_steps=1000 --checkpoints_total_limit=3 \
     --learning_rate=1e-5 --lr_warmup_steps=0 \
     --mixed_precision=fp16 \
