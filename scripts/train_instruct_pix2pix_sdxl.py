@@ -1020,9 +1020,7 @@ def main():
                 original_pixel_values = original_pixel_values.to(
                     accelerator.device, non_blocking=True
                 )
-                original_image_embeds = vae.encode(
-                    original_pixel_values
-                ).latent_dist.sample()
+                original_image_embeds = vae.encode(original_pixel_values).latent_dist.mode()
                 if args.pretrained_vae_model_name_or_path is None:
                     original_image_embeds = original_image_embeds.to(weight_dtype)
 
