@@ -46,7 +46,7 @@ from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_instru
     StableDiffusionXLInstructPix2PixPipeline,
 )
 from diffusers.training_utils import EMAModel
-from diffusers.utils import check_min_version, deprecate, is_wandb_available, load_image
+from diffusers.utils import check_min_version, deprecate, is_wandb_available, load_image, make_image_grid
 from diffusers.utils.import_utils import is_xformers_available
 
 if is_wandb_available():
@@ -478,14 +478,17 @@ def log_validation(
 
     for tracker in accelerator.trackers:
         if tracker.name == "wandb":
-            wandb_table = wandb.Table(columns=WANDB_TABLE_COL_NAMES)
-            for edited_image in edited_images:
-                wandb_table.add_data(
-                    wandb.Image(original_image),
-                    wandb.Image(edited_image),
-                    args.validation_prompt,
-                )
-            tracker.log({"validation": wandb_table})
+            tracker.log(
+                {
+                    "validation": [
+                        wandb.Image(
+                            make_image_grid([original_image, edited_image], 1, 2),
+                            caption=f"{i}: {args.validation_prompt}",
+                        )
+                        for i, edited_image in enumerate(edited_images)
+                    ]
+                }
+            )
 
     del pipeline
     torch.cuda.empty_cache()
@@ -852,10 +855,12 @@ def main():
         prompt_embeds_all = prompt_embeds_all.to(accelerator.device)
         pooled_prompt_embeds_all = pooled_prompt_embeds_all.to(accelerator.device)
         return prompt_embeds_all, pooled_prompt_embeds_all
-    
+
     # Get null conditioning.
     # Remains fixed throughout training.
-    null_conditioning_prompt_embeds, null_conditioning_pooled_prompt_embeds = encode_prompt([""], text_encoders, tokenizers)
+    null_conditioning_prompt_embeds, null_conditioning_pooled_prompt_embeds = encode_prompt(
+        [""], text_encoders, tokenizers
+    )
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
@@ -923,7 +928,7 @@ def main():
                     prompt_mask = random_p < 2 * args.conditioning_dropout_prob
                     prompt_mask = prompt_mask.reshape(bsz, 1, 1)
                     pooled_prompt_mask = prompt_mask.reshape(bsz, 1)
-                    
+
                     # Final text conditioning.
                     prompt_embeds = torch.where(prompt_mask, null_conditioning_prompt_embeds, prompt_embeds)
                     pooled_prompt_embeds = torch.where(
