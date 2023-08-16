@@ -737,36 +737,6 @@ def main():
     tokenizers = [tokenizer_1, tokenizer_2]
     text_encoders = [text_encoder_1, text_encoder_2]
 
-    def tokenize_captions(captions, tokenizer):
-        inputs = tokenizer(
-            captions,
-            max_length=tokenizer.model_max_length,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
-        return inputs.input_ids
-
-    # Get null conditioning.
-    def compute_null_conditioning():
-        null_conditioning_list = []
-        for tokenizer, text_encoder in zip(tokenizers, text_encoders):
-            prompt_embeds = text_encoder(
-                tokenize_captions([""], tokenizer=tokenizer).to(text_encoder.device),
-                output_hidden_states=True,
-            )
-            null_pooled_prompt_embeds = prompt_embeds[0]
-            prompt_embeds = prompt_embeds.hidden_states[-2]
-            bs_embed, seq_len, _ = prompt_embeds.shape
-            null_conditioning_list.append(prompt_embeds)
-
-        null_prompt_embeds = torch.concat(null_conditioning_list, dim=-1)
-        null_pooled_prompt_embeds = null_pooled_prompt_embeds.view(bs_embed, -1)
-        return null_prompt_embeds, null_pooled_prompt_embeds
-
-    # Remains fixed throughout training.
-    null_conditioning_prompt_embeds, null_conditioning_pooled_prompt_embeds = compute_null_conditioning()
-
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
     num_update_steps_per_epoch = math.ceil(train_dataloader.num_batches / args.gradient_accumulation_steps)
@@ -844,6 +814,16 @@ def main():
     )
     progress_bar.set_description("Steps")
 
+    def tokenize_captions(captions, tokenizer):
+        inputs = tokenizer(
+            captions,
+            max_length=tokenizer.model_max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        return inputs.input_ids
+
     # Adapted from diffusers.pipelines.StableDiffusionXLPipeline.encode_prompt
     def encode_prompt(prompts, text_encoders, tokenizers):
         prompt_embeds_list = []
@@ -872,6 +852,10 @@ def main():
         prompt_embeds_all = prompt_embeds_all.to(accelerator.device)
         pooled_prompt_embeds_all = pooled_prompt_embeds_all.to(accelerator.device)
         return prompt_embeds_all, pooled_prompt_embeds_all
+    
+    # Get null conditioning.
+    # Remains fixed throughout training.
+    null_conditioning_prompt_embeds, null_conditioning_pooled_prompt_embeds = encode_prompt([""], text_encoders, tokenizers)
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
@@ -938,10 +922,12 @@ def main():
                     # Sample masks for the edit prompts.
                     prompt_mask = random_p < 2 * args.conditioning_dropout_prob
                     prompt_mask = prompt_mask.reshape(bsz, 1, 1)
+                    pooled_prompt_mask = prompt_mask.reshape(bsz, 1)
+                    
                     # Final text conditioning.
                     prompt_embeds = torch.where(prompt_mask, null_conditioning_prompt_embeds, prompt_embeds)
                     pooled_prompt_embeds = torch.where(
-                        prompt_mask, null_conditioning_pooled_prompt_embeds, prompt_embeds
+                        pooled_prompt_mask, null_conditioning_pooled_prompt_embeds, pooled_prompt_embeds
                     )
 
                     # Sample masks for the original images.
