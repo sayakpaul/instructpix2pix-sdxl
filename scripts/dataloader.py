@@ -41,14 +41,8 @@ def get_dataloader(args):
     num_samples = num_batches * args.global_batch_size
 
     # Preprocessing the datasets.
-    train_resize = transforms.Resize(
-        args.resolution, interpolation=transforms.InterpolationMode.BILINEAR
-    )
-    train_crop = (
-        transforms.CenterCrop(args.resolution)
-        if args.center_crop
-        else transforms.RandomCrop(args.resolution)
-    )
+    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
+    train_crop = transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution)
     train_flip = transforms.RandomHorizontalFlip(p=1.0)
     normalize = transforms.Normalize([0.5], [0.5])
 
@@ -70,9 +64,7 @@ def get_dataloader(args):
             x1 = max(0, int(round((orig_image.width - args.resolution) / 2.0)))
             images = train_crop(images)
         else:
-            y1, x1, h, w = train_crop.get_params(
-                images, (args.resolution, args.resolution)
-            )
+            y1, x1, h, w = train_crop.get_params(images, (args.resolution, args.resolution))
             images = crop(images, y1, x1, h, w)
 
         if args.random_flip and random.random() < 0.5:
@@ -98,9 +90,7 @@ def get_dataloader(args):
 
     def collate_fn(samples):
         original_images = torch.stack([sample["original_image"] for sample in samples])
-        original_images = original_images.to(
-            memory_format=torch.contiguous_format
-        ).float()
+        original_images = original_images.to(memory_format=torch.contiguous_format).float()
 
         edited_images = torch.stack([sample["edited_image"] for sample in samples])
         edited_images = edited_images.to(memory_format=torch.contiguous_format).float()
