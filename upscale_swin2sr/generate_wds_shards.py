@@ -11,11 +11,7 @@ def main():
     dataset_path = "/scratch/suraj/instructpix2pix-clip-filtered-upscaled"
     wds_shards_path = "/scratch/suraj/instructpix2pix-clip-filtered-upscaled-wds"
     # get all .arrow files in the dataset path
-    dataset_files = [
-        os.path.join(dataset_path, f)
-        for f in os.listdir(dataset_path)
-        if f.endswith(".arrow")
-    ]
+    dataset_files = [os.path.join(dataset_path, f) for f in os.listdir(dataset_path) if f.endswith(".arrow")]
 
     @ray.remote
     def create_shard(path):

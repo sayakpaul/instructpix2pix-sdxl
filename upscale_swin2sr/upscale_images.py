@@ -27,9 +27,7 @@ PROJECT_DIR = "/scratch"
 
 def download_model_weights() -> None:
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    url = "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/{}".format(
-        os.path.basename(MODEL_PATH)
-    )
+    url = "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/{}".format(os.path.basename(MODEL_PATH))
     r = requests.get(url, allow_redirects=True)
     with open(MODEL_PATH, "wb") as f:
         f.write(r.content)
@@ -53,9 +51,7 @@ def load_model() -> torch.nn.Module:
     )
     pretrained_model = torch.load(MODEL_PATH)
     model.load_state_dict(
-        pretrained_model[PARAM_KEY_G]
-        if PARAM_KEY_G in pretrained_model.keys()
-        else pretrained_model,
+        pretrained_model[PARAM_KEY_G] if PARAM_KEY_G in pretrained_model.keys() else pretrained_model,
         strict=True,
     )
     return model
@@ -82,9 +78,7 @@ def postprocess_image(output: torch.Tensor) -> PIL.Image.Image:
     return PIL.Image.fromarray(output)
 
 
-def gen_examples(
-    original_prompts, original_images, edit_prompts, edited_prompts, edited_images
-):
+def gen_examples(original_prompts, original_images, edit_prompts, edited_prompts, edited_images):
     def fn():
         for i in range(len(original_prompts)):
             yield {
@@ -99,9 +93,7 @@ def gen_examples(
 
 
 if __name__ == "__main__":
-    dataset = datasets.load_dataset(
-        DATASET_NAME, split="train", num_proc=4, cache_dir=PROJECT_DIR
-    )
+    dataset = datasets.load_dataset(DATASET_NAME, split="train", num_proc=4, cache_dir=PROJECT_DIR)
     print(f"Dataset has got {len(dataset)} samples.")
 
     model = load_model().eval().to("cuda:1")
@@ -111,21 +103,15 @@ if __name__ == "__main__":
     os.makedirs(folder_path, exist_ok=True)
 
     def pp(examples):
-        examples["original_image"] = [
-            preprocesss_image(image) for image in examples["original_image"]
-        ]
-        examples["edited_image"] = [
-            preprocesss_image(image) for image in examples["edited_image"]
-        ]
+        examples["original_image"] = [preprocesss_image(image) for image in examples["original_image"]]
+        examples["edited_image"] = [preprocesss_image(image) for image in examples["edited_image"]]
         examples["original_prompt"] = [prompt for prompt in examples["original_prompt"]]
         examples["edit_prompt"] = [prompt for prompt in examples["edit_prompt"]]
         examples["edited_prompt"] = [prompt for prompt in examples["edited_prompt"]]
         return examples
 
     dataset = dataset.with_transform(pp)
-    dataloader = DataLoader(
-        dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, pin_memory=True
-    )
+    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, pin_memory=True)
     print("Dataloader prepared.")
 
     all_upscaled_original_paths = []
@@ -140,9 +126,7 @@ if __name__ == "__main__":
             # forward pass.
             images = [image for image in batch["original_image"]]
             images += [image for image in batch["edited_image"]]
-            images = torch.stack(images).to(
-                "cuda:1", memory_format=torch.contiguous_format
-            )
+            images = torch.stack(images).to("cuda:1", memory_format=torch.contiguous_format)
 
             # Inference.
             output_images = model(images)
@@ -158,13 +142,11 @@ if __name__ == "__main__":
             all_edited_prompts += [prompt for prompt in batch["edited_prompt"]]
 
             orig_img_paths = [
-                os.path.join(folder_path, f"{idx}_{i}_original_img.png")
-                for i in range(len(original_images))
+                os.path.join(folder_path, f"{idx}_{i}_original_img.png") for i in range(len(original_images))
             ]
             all_upscaled_original_paths += [path for path in orig_img_paths]
             edited_img_paths = [
-                os.path.join(folder_path, f"{idx}_{i}_edited_img.png")
-                for i in range(len(edited_images))
+                os.path.join(folder_path, f"{idx}_{i}_edited_img.png") for i in range(len(edited_images))
             ]
             all_upscaled_edited_paths += [path for path in edited_img_paths]
 
