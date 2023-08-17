@@ -779,7 +779,7 @@ def main():
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
         logger.info("Preparing trackers")
-        accelerator.init_trackers("instruct-pix2pix-sdxl", config=vars(args))
+        accelerator.init_trackers("instruct-pix2pix-sdxl-new", config=vars(args))
 
     # Train!
     total_batch_size = args.per_gpu_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
