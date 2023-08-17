@@ -46,7 +46,7 @@ from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_instru
     StableDiffusionXLInstructPix2PixPipeline,
 )
 from diffusers.training_utils import EMAModel
-from diffusers.utils import check_min_version, deprecate, is_wandb_available, load_image, make_image_grid
+from diffusers.utils import check_min_version, deprecate, is_wandb_available, load_image
 from diffusers.utils.import_utils import is_xformers_available
 
 if is_wandb_available():
@@ -454,10 +454,7 @@ def log_validation(
         if urlparse(image_url_or_path).scheme
         else Image.open(image_url_or_path).convert("RGB")
     )(args.val_image_url_or_path)
-    with torch.autocast(
-        accelerator.device.type,
-        enabled=accelerator.mixed_precision == "fp16",
-    ):
+    with torch.autocast("cuda"):
         edited_images = []
         for val_img_idx in range(args.num_validation_images):
             a_val_img = pipeline(
@@ -476,19 +473,13 @@ def log_validation(
                 )
             )
 
+    formatted_images = [wandb.Image(original_image, caption="Original Image")]
+    for edited_image in edited_images:
+        formatted_images.append(wandb.Image(edited_image, caption=args.validation_prompt))
+
     for tracker in accelerator.trackers:
         if tracker.name == "wandb":
-            tracker.log(
-                {
-                    "validation": [
-                        wandb.Image(
-                            make_image_grid([original_image, edited_image], 1, 2),
-                            caption=f"{i}: {args.validation_prompt}",
-                        )
-                        for i, edited_image in enumerate(edited_images)
-                    ]
-                }
-            )
+            tracker.log({"validation": formatted_images})
 
     del pipeline
     torch.cuda.empty_cache()
@@ -1076,10 +1067,7 @@ def main():
                 if urlparse(image_url_or_path).scheme
                 else Image.open(image_url_or_path).convert("RGB")
             )(args.val_image_url_or_path)
-            with torch.autocast(
-                accelerator.device.type,
-                enabled=accelerator.mixed_precision == "fp16",
-            ):
+            with torch.autocast("cuda"):
                 for _ in range(args.num_validation_images):
                     edited_images.append(
                         pipeline(
