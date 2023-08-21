@@ -454,11 +454,15 @@ def log_validation(
         if urlparse(image_url_or_path).scheme
         else Image.open(image_url_or_path).convert("RGB")
     )(args.val_image_url_or_path)
+    original_image = original_image.resize((args.resolution, args.resolution))
+    
     with torch.autocast("cuda"):
         edited_images = []
         for val_img_idx in range(args.num_validation_images):
             a_val_img = pipeline(
                 args.validation_prompt,
+                height=args.resolution,
+                width=args.resolution,
                 image=original_image,
                 num_inference_steps=25,
                 image_guidance_scale=1.5,
@@ -1067,12 +1071,16 @@ def main():
                 if urlparse(image_url_or_path).scheme
                 else Image.open(image_url_or_path).convert("RGB")
             )(args.val_image_url_or_path)
+            original_image = original_image.resize((args.resolution, args.resolution))
+
             with torch.autocast("cuda"):
                 for _ in range(args.num_validation_images):
                     edited_images.append(
                         pipeline(
                             args.validation_prompt,
                             image=original_image,
+                            height=args.resolution,
+                            width=args.resolution,
                             num_inference_steps=25,
                             image_guidance_scale=1.5,
                             guidance_scale=5.0,
