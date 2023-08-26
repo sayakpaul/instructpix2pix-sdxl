@@ -386,6 +386,12 @@ def parse_args():
         action="store_true",
         help="Whether or not to use xformers.",
     )
+    parser.add_argument(
+        "--transformer_layers_per_block",
+        type=str,
+        default=None,
+        help=("The number of layers per block in the transformer. If None, defaults to" " `args.transformer_layers`."),
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -455,7 +461,7 @@ def log_validation(
         else Image.open(image_url_or_path).convert("RGB")
     )(args.val_image_url_or_path)
     original_image = original_image.resize((args.resolution, args.resolution))
-    
+
     with torch.autocast("cuda"):
         edited_images = []
         for val_img_idx in range(args.num_validation_images):
@@ -557,7 +563,7 @@ def main():
         subfolder="vae" if args.pretrained_vae_model_name_or_path is None else None,
         revision=args.revision,
     )
-    unet = UNet2DConditionModel.from_pretrained(
+    pre_unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision
     )
 
@@ -567,21 +573,33 @@ def main():
     # from the pre-trained checkpoints. For the extra channels added to the first layer, they are
     # initialized to zero.
     logger.info("Initializing the XL InstructPix2Pix UNet from the pretrained UNet.")
-    in_channels = 8
-    out_channels = unet.conv_in.out_channels
-    unet.register_to_config(in_channels=in_channels)
+    if args.transformer_layers_per_block is None:
+        in_channels = 8
+        out_channels = pre_unet.conv_in.out_channels
+        pre_unet.register_to_config(in_channels=in_channels)
 
-    with torch.no_grad():
-        new_conv_in = nn.Conv2d(
-            in_channels,
-            out_channels,
-            unet.conv_in.kernel_size,
-            unet.conv_in.stride,
-            unet.conv_in.padding,
+        with torch.no_grad():
+            new_conv_in = nn.Conv2d(
+                in_channels,
+                out_channels,
+                pre_unet.conv_in.kernel_size,
+                pre_unet.conv_in.stride,
+                pre_unet.conv_in.padding,
+            )
+            new_conv_in.weight.zero_()
+            new_conv_in.weight[:, :4, :, :].copy_(pre_unet.conv_in.weight)
+            pre_unet.conv_in = new_conv_in
+        unet = pre_unet
+    else:
+        transformer_layers_per_block = [int(x) for x in args.transformer_layers_per_block.split(",")]
+        down_block_types = ["DownBlock2D" if l == 0 else "CrossAttnDownBlock2D" for l in transformer_layers_per_block]
+        unet = UNet2DConditionModel.from_config(
+            pre_unet.config,
+            down_block_types=down_block_types,
+            transformer_layers_per_block=transformer_layers_per_block,
         )
-        new_conv_in.weight.zero_()
-        new_conv_in.weight[:, :4, :, :].copy_(unet.conv_in.weight)
-        unet.conv_in = new_conv_in
+        unet.load_state_dict(pre_unet.state_dict(), strict=False)
+        del pre_unet
 
     # Create EMA for the unet.
     if args.use_ema:
