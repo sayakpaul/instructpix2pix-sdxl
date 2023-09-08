@@ -52,10 +52,13 @@ def get_dataloader(args):
         # Some utilities have been taken from
         # https://github.com/huggingface/diffusers/blob/main/examples/text_to_image/train_text_to_image_lora_sdxl.py
         orig_image = sample["original_image"]
+        edited_image = sample["edited_image"]
+        if edited_image.size != orig_image.size:
+            edited_image = edited_image.resize(orig_image.size)
         images = torch.stack(
             [
-                transforms.ToTensor()(sample["original_image"]),
-                transforms.ToTensor()(sample["edited_image"]),
+                transforms.ToTensor()(orig_image),
+                transforms.ToTensor()(edited_image),
             ]
         )
         images = train_resize(images)
